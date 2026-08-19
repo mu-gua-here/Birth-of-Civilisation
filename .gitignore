@@ -1,1 +1,15 @@
 .DS_Store
+
+# Godot 4 editor/import cache -- fully regenerable, shouldn't be tracked
+.godot/
+
+# Godot editor crash-recovery / autosave scratch files
+*.tmp
+*.depren
+
+# Native export templates & build artifacts
+*.pck
+export.cfg
+
+# Addons
+addons/

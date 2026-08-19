@@ -1,0 +1,33 @@
+[gd_scene format=3 uid="uid://cwik60akjhciu"]
+
+[ext_resource type="Script" uid="uid://cupa81y0w0n4l" path="res://scripts/citizen.gd" id="1_fhwll"]
+
+[sub_resource type="CapsuleShape3D" id="CapsuleShape3D_fhwll"]
+
+[sub_resource type="ORMMaterial3D" id="ORMMaterial3D_3aquc"]
+albedo_color = Color(0.9302438, 0.7224296, 0, 1)
+
+[sub_resource type="CapsuleMesh" id="CapsuleMesh_3aquc"]
+material = SubResource("ORMMaterial3D_3aquc")
+
+[node name="Citizen" type="CharacterBody3D" unique_id=408327407]
+script = ExtResource("1_fhwll")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=432418997]
+shape = SubResource("CapsuleShape3D_fhwll")
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=647360872]
+mesh = SubResource("CapsuleMesh_3aquc")
+
+[node name="NavigationAgent3D" type="NavigationAgent3D" parent="." unique_id=1087809605]
+path_desired_distance = 0.1
+target_desired_distance = 0.1
+path_max_distance = 0.51
+avoidance_enabled = true
+height = 0.1
+radius = 0.1
+neighbor_distance = 0.1
+max_neighbors = 1
+time_horizon_obstacles = 0.5
+max_speed = 1.0
+use_3d_avoidance = true

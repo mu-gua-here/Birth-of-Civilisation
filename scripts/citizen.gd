@@ -1,8 +1,10 @@
+# NOTE: LOTS OF OUTDATED CODE, WILL RESOLVE IN NEXT COMMIT
+
 extends Carrier
 
 # Movement settings
-const BASE_SPEED = 5.0
-const JUMP_HEIGHT := 1.0
+@export var BASE_SPEED = 2.0
+@export var BOUNCE_HEIGHT := 4.0
 var actual_speed: float
 var wander_timer: float = 0.0
 var idle_timer: float = 0.0
@@ -41,10 +43,7 @@ var is_building: bool = false
 var build_target_id: String = NO_ID
 
 # Pushing a gathered resource prop back toward the spawn/stockpile point
-# (Carrier.SPAWN_POINT) after a gather completes -- see carrier.gd for the
-# actual per-frame push, which is shared with player.gd. This just drives a
-# citizen to walk up to the nearest uncollected prop so the push has
-# something in reach.
+# (Carrier.SPAWN_POINT) after a gather completes
 var is_pushing: bool = false
 var push_target: RigidBody3D = null
 var push_repath_timer: float = 0.0
@@ -56,20 +55,32 @@ func _ready():
 	
 	add_to_group("citizen")
 	_carrier_ready() # sets `builder` (see carrier.gd)
-		
-	call_deferred("set_new_destination", Vector3(
-		randf_range(-20, 20),
-		0,
-		randf_range(-20, 20)))
+	
 	nav_agent.velocity_computed.connect(_on_velocity_computed)
 	
 	# Create the override material
 	happiness_material = StandardMaterial3D.new()
 	mesh_instance.set_surface_override_material(0, happiness_material)
 	update_happiness_color()
+	
+	# call_deferred only defers the CALL
+	_request_initial_wander()
+
+func _request_initial_wander() -> void:
+	# A single await get_tree().physics_frame isn't reliably enough -- if the
+	# NavigationRegion3D is still registering its polygons with the server around the same
+	# time citizens spawn (both happening during the scene's initial _ready() pass), the
+	# map's first sync can land on a later frame. map_get_iteration_id() is 0 until the map
+	# has synced at least once, so poll it instead of guessing a frame count.
+	var map_rid = nav_agent.get_navigation_map()
+	while NavigationServer3D.map_get_iteration_id(map_rid) == 0:
+		await get_tree().physics_frame
+		if not is_instance_valid(self):
+			return
+	set_new_destination(_wander_target(20.0))
 
 func _exit_tree():
-	if builder and builder.has_method("release_citizen") and data:
+	if builder and is_instance_valid(builder) and data:
 		builder.release_citizen(data.id)
 
 func _physics_process(delta):
@@ -131,26 +142,32 @@ func _physics_process(delta):
 		wander_timer -= delta
 		if is_on_floor() and wander_timer > 0:
 			if data.energy > 0.0:
-				velocity.y = JUMP_HEIGHT
+				velocity.y = BOUNCE_HEIGHT
 		else:
 			wander_timer = randf_range(0, 2) * (100 - data.happiness)
 			idle_timer -= delta
 			if idle_timer <= 0:
-				set_new_destination(Vector3(
-					randf_range(-20, 20),
-					0,
-					randf_range(-20, 20)
-				))
+				set_new_destination(_wander_target(20.0))
 				idle_timer = clamp(data.happiness, 180, 6000)	
 	
 	if not nav_agent.is_navigation_finished() and data.energy > 0.0:
-		var next = nav_agent.get_next_path_position()
-		var direction = (next - global_position).normalized()
-		var desired_velocity = Vector3(direction.x * actual_speed, velocity.y, direction.z * actual_speed)
-		if nav_agent.avoidance_enabled:
-			nav_agent.set_velocity(desired_velocity)  # triggers velocity_computed signal
+		# Guards against the same "Invalid navigation index" error for targets that aren't
+		# wander points (chase, gather, push) -- those come from real object positions, so
+		# _wander_target()'s snapping doesn't cover them. If the river (or anything else)
+		# splits the navmesh into disconnected pieces, a target on the far side is legitimately
+		# unreachable and querying it every frame is what spams the engine error. Just coast
+		# to a stop instead of repeatedly asking for a path that will never exist.
+		if not nav_agent.is_target_reachable():
+			velocity.x = move_toward(velocity.x, 0, actual_speed)
+			velocity.z = move_toward(velocity.z, 0, actual_speed)
 		else:
-			velocity = desired_velocity
+			var next = nav_agent.get_next_path_position()
+			var direction = (next - global_position).normalized()
+			var desired_velocity = Vector3(direction.x * actual_speed, velocity.y, direction.z * actual_speed)
+			if nav_agent.avoidance_enabled:
+				nav_agent.set_velocity(desired_velocity)  # triggers velocity_computed signal
+			else:
+				velocity = desired_velocity
 	else:
 		velocity.x = move_toward(velocity.x, 0, actual_speed)
 		velocity.z = move_toward(velocity.z, 0, actual_speed)
@@ -326,6 +343,16 @@ func _update_building(delta: float) -> void:
 
 func set_new_destination(target):
 	nav_agent.target_position = target
+
+# Wander targets used to be raw random points with no regard for whether the navmesh
+# actually covers that spot
+func _wander_target(nav_range: float) -> Vector3:
+	var raw = global_position + Vector3(randf_range(-nav_range, nav_range), 0, randf_range(-nav_range, nav_range))
+	var map_rid = nav_agent.get_navigation_map()
+	# If map not synced yet, return raw (unsnapped) point
+	if NavigationServer3D.map_get_iteration_id(map_rid) == 0:
+		return raw
+	return NavigationServer3D.map_get_closest_point(map_rid, raw)
 
 func update_happiness_color():
 	# Green when happy, red when unhappy

@@ -1,0 +1,60 @@
+[gd_scene format=3 uid="uid://brtnbthe2mkky"]
+
+[ext_resource type="Script" uid="uid://d3see772ji4un" path="res://addons/itch_uploader/ui/export_process_modal/log_modal.gd" id="1_c3psv"]
+
+[node name="LogModal" type="Window" unique_id=405414241]
+oversampling_override = 1.0
+initial_position = 2
+size = Vector2i(500, 600)
+transient = true
+exclusive = true
+popup_window = true
+min_size = Vector2i(400, 300)
+script = ExtResource("1_c3psv")
+
+[node name="BackgroundPanel" type="Panel" parent="." unique_id=1801138870]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="BackgroundPanel" unique_id=1356441630]
+layout_mode = 1
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ScrollContainer" type="ScrollContainer" parent="BackgroundPanel/VBoxContainer" unique_id=1557442807]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="LogText" type="RichTextLabel" parent="BackgroundPanel/VBoxContainer/ScrollContainer" unique_id=65600923]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+focus_mode = 2
+fit_content = true
+scroll_active = false
+autowrap_mode = 0
+tab_size = 2
+context_menu_enabled = true
+selection_enabled = true
+
+[node name="ErrorTips" type="RichTextLabel" parent="BackgroundPanel/VBoxContainer" unique_id=733884711]
+unique_name_in_owner = true
+visible = false
+layout_mode = 2
+theme_override_colors/default_color = Color(1, 0.8666667, 0.39607844, 1)
+bbcode_enabled = true
+fit_content = true
+scroll_active = false
+
+[connection signal="close_requested" from="." to="." method="_on_close_requested"]

@@ -1,0 +1,140 @@
+[gd_scene format=3 uid="uid://cbogc5o77kvs"]
+
+[ext_resource type="Script" uid="uid://bit40ipxgv3uq" path="res://addons/itch_uploader/ui/export_process_modal/export_process_entry.gd" id="1_omh2a"]
+[ext_resource type="Texture2D" uid="uid://s35fbyhsuob2" path="res://addons/itch_uploader/ui/icons/StatusSuccess.svg" id="1_vplol"]
+[ext_resource type="Texture2D" uid="uid://2la41tsp8yt2" path="res://addons/itch_uploader/ui/icons/StatusError.svg" id="2_rtpra"]
+[ext_resource type="Texture2D" uid="uid://bjs63filx04ml" path="res://addons/itch_uploader/ui/icons/StatusWarning.svg" id="3_5pwgu"]
+[ext_resource type="Texture2D" uid="uid://c3yu1m30ncl0g" path="res://addons/itch_uploader/ui/icons/Progress1.svg" id="5_bynnk"]
+[ext_resource type="Texture2D" uid="uid://ddjvx8k3a5cpf" path="res://addons/itch_uploader/ui/icons/Progress2.svg" id="6_qsk48"]
+[ext_resource type="Texture2D" uid="uid://d01l6bvgil3ny" path="res://addons/itch_uploader/ui/icons/Progress3.svg" id="7_6v4lh"]
+[ext_resource type="Texture2D" uid="uid://cx5t1t441addh" path="res://addons/itch_uploader/ui/icons/Progress4.svg" id="8_pf4vc"]
+[ext_resource type="Texture2D" uid="uid://cpsrhpmg1xddr" path="res://addons/itch_uploader/ui/icons/Progress5.svg" id="9_3dstl"]
+[ext_resource type="Texture2D" uid="uid://d37rv8d38lkk2" path="res://addons/itch_uploader/ui/icons/Progress6.svg" id="10_6gq85"]
+[ext_resource type="Texture2D" uid="uid://dw43oys1kj55v" path="res://addons/itch_uploader/ui/icons/Progress7.svg" id="11_u5ija"]
+[ext_resource type="Texture2D" uid="uid://cakfrm2kp7mqh" path="res://addons/itch_uploader/ui/icons/Progress8.svg" id="12_it5vk"]
+
+[sub_resource type="SpriteFrames" id="SpriteFrames_dvn53"]
+animations = [{
+"frames": [{
+"duration": 1.0,
+"texture": ExtResource("5_bynnk")
+}, {
+"duration": 1.0,
+"texture": ExtResource("6_qsk48")
+}, {
+"duration": 1.0,
+"texture": ExtResource("7_6v4lh")
+}, {
+"duration": 1.0,
+"texture": ExtResource("8_pf4vc")
+}, {
+"duration": 1.0,
+"texture": ExtResource("9_3dstl")
+}, {
+"duration": 1.0,
+"texture": ExtResource("10_6gq85")
+}, {
+"duration": 1.0,
+"texture": ExtResource("11_u5ija")
+}, {
+"duration": 1.0,
+"texture": ExtResource("12_it5vk")
+}],
+"loop": 1,
+"name": &"default",
+"speed": 10.0
+}]
+
+[node name="ExportProcessEntry" type="HBoxContainer" unique_id=1672603196]
+custom_minimum_size = Vector2(0, 32)
+offset_right = 256.0
+offset_bottom = 32.0
+script = ExtResource("1_omh2a")
+
+[node name="IconContainer" type="Control" parent="." unique_id=744942586]
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+
+[node name="SuccessStatusIcon" type="TextureRect" parent="IconContainer" unique_id=2068431685]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+tooltip_text = "Success"
+texture = ExtResource("1_vplol")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ErrorStatusIcon" type="TextureRect" parent="IconContainer" unique_id=1252949916]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+tooltip_text = "Error"
+texture = ExtResource("2_rtpra")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="CanceledStatusIcon" type="TextureRect" parent="IconContainer" unique_id=1950471019]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+tooltip_text = "Canceled"
+texture = ExtResource("3_5pwgu")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="InProgressStatusIcon" type="Control" parent="IconContainer" unique_id=1672833050]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 8
+anchor_left = 0.5
+anchor_top = 0.5
+anchor_right = 0.5
+anchor_bottom = 0.5
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="InProgressStatusIconSprite" type="AnimatedSprite2D" parent="IconContainer/InProgressStatusIcon" unique_id=78934445]
+unique_name_in_owner = true
+scale = Vector2(0.75, 0.75)
+sprite_frames = SubResource("SpriteFrames_dvn53")
+autoplay = "default"
+frame_progress = 0.514903
+
+[node name="ExportPresetNameLabel" type="Label" parent="." unique_id=280658378]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+text = "???"
+
+[node name="ButtonContainer" type="Control" parent="." unique_id=1167571972]
+custom_minimum_size = Vector2(88, 0)
+layout_mode = 2
+
+[node name="ViewLogButton" type="Button" parent="ButtonContainer" unique_id=580451077]
+unique_name_in_owner = true
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "View Log"
+
+[connection signal="pressed" from="ButtonContainer/ViewLogButton" to="." method="emit_signal" binds= ["log_requested"]]

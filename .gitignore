@@ -6,10 +6,19 @@
 # Godot editor crash-recovery / autosave scratch files
 *.tmp
 *.depren
+*.import
+
+# Generated translation binaries (fully regenerable)
+*.translation
 
 # Native export templates & build artifacts
 *.pck
 export.cfg
 
-# Addons
-addons/
+# Exported build artifacts (optional)
+*.exe
+*.zip
+*.apk
+*.aab
+*.x86_64
+*.wasm

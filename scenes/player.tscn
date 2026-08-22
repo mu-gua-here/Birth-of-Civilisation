@@ -1,6 +1,6 @@
 [gd_scene format=3 uid="uid://dqlr0bede3xqd"]
 
-[ext_resource type="Script" uid="uid://bq3xr5c3wyjvb" path="res://addons/floatable_body/floatable_player_3d.gd" id="1_3vyb7"]
+[ext_resource type="Script" uid="uid://c1x2k2iiyluhs" path="res://scripts/player.gd" id="1_3vyb7"]
 
 [sub_resource type="ORMMaterial3D" id="ORMMaterial3D_2wyq8"]
 albedo_color = Color(0.48235294, 1, 1, 1)
@@ -10,12 +10,12 @@ material = SubResource("ORMMaterial3D_2wyq8")
 
 [sub_resource type="CapsuleShape3D" id="CapsuleShape3D_2tfuy"]
 
-[node name="FloatablePlayer3D" type="CharacterBody3D" unique_id=2059796995]
+[node name="Player" type="CharacterBody3D" unique_id=402418124]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 script = ExtResource("1_3vyb7")
-metadata/_custom_type_script = "uid://bq3xr5c3wyjvb"
 
-[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=738324975]
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1348972503]
 mesh = SubResource("CapsuleMesh_og1vs")
 
-[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=513770403]
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=1069096531]
 shape = SubResource("CapsuleShape3D_2tfuy")

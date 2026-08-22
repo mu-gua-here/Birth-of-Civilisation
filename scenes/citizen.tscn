@@ -11,6 +11,7 @@ albedo_color = Color(0.9302438, 0.7224296, 0, 1)
 material = SubResource("ORMMaterial3D_3aquc")
 
 [node name="Citizen" type="CharacterBody3D" unique_id=408327407]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 0, 0, 0)
 script = ExtResource("1_fhwll")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=432418997]

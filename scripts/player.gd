@@ -22,12 +22,20 @@ var gather_target_id: String = NO_ID
 var is_building_task: bool = false
 var build_target_id: String = NO_ID
 
-var spawn_point := global_position
+var spawn_point:Vector3i
 
-# Player stats
-@export var SPEED = 1.5
-@export var JUMP_VELOCITY = 20.0
-@export var FRICTION = 0.8
+# Player physical movement
+@export var SPEED: float = 0.5
+@export var JUMP_HEIGHT: float = 6.0
+@export var SWIM_IMPULSE: float = 6.0
+@export var FRICTION: float = 0.8
+@export var WATER_RESISTANCE: float = 0.9
+
+@export var BOUNCE_HEIGHT := 4.0
+var bounce_active := false
+
+@export var swim_cooldown: float = 0.2
+var swim_timer: float = 0.0
 
 # Player physiological settings
 @export var max_health: float = 100.0
@@ -45,13 +53,27 @@ signal health_changed(current: float, max: float)
 signal died
 
 func _ready():
-	print(global_position)
+	spawn_point = global_position
 	add_to_group("player")
 	if view_node == null:
-		get_tree().get_first_node_in_group("view")
+		view_node = find_first_node_by_name(get_tree().root, "View")
+		if view_node == null:
+			print("Player: Viewing node not found.")
+		else:
+			print("Player: Using \"%s\" as viewing node" % view_node.name)
 	Globals.register_player(self)
 	health = max_health
 	_carrier_ready() # sets `builder` (see carrier.gd)
+
+func find_first_node_by_name(root: Node, target_name: String) -> Node:
+	for child in root.get_children():
+		if child.name == target_name:
+			return child
+		var found := find_first_node_by_name(child, target_name)
+		if found:
+			return found
+	return null
+
 
 func _physics_process(delta: float) -> void:
 	_apply_buoyancy(delta) # see carrier.gd -- must run before gravity/movement
@@ -60,45 +82,79 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 
-	# Handle jump
-	if Input.is_action_just_pressed("ui_accept") and is_on_floor() and energy > 0.0:
-		velocity.y = JUMP_VELOCITY
-		energy -= velocity.y * 0.1
-
-	# Get the input direction and handle the movement/deceleration.
-	var cam_basis = view_node.rotation.y if view_node else 0.0
+	# Handle jump -- a full jump off solid ground, or a much gentler swim
+	# stroke if we're submerged but not standing on anything (see
+	# fluid_buoyancy_scale in carrier.gd for why this doesn't rocket to the
+	# surface: buoyancy + gravity here settle toward a slow sink, and this
+	# stroke is the player's only way to actively counteract that).
+	
+	# Update swim cooldown timer
+	if swim_timer > 0.0:
+		swim_timer -= delta
+	
+	var energy_mult:float = clamp(energy * 0.02, 0.25, 1.0)
+	var just_jumped := false
+	
+	if Input.is_action_just_pressed("player_jump") and energy > 0.0:
+		if is_in_fluid():
+			if swim_timer <= 0.0:
+				velocity.y = SWIM_IMPULSE
+				energy -= SWIM_IMPULSE * 0.01
+				swim_timer = swim_cooldown
+				just_jumped = true
+		# Allow for jumping when player bounces, but not on the exact frame
+		# player starts moving, otherwise will result in unusually high jump
+		elif is_on_floor() or bounce_active:
+			velocity.y = JUMP_HEIGHT
+			energy -= JUMP_HEIGHT * 0.01
+			bounce_active = false
+			just_jumped = true
+		# Apply tiredness factor to jump heights too
+		if just_jumped:
+			velocity.y *= energy_mult
+	
+	# Get the input direction and handle the movement/deceleration
+	
+	# Construct player movement vector
+	var direction:Vector3
 	var input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	var direction = Vector3(input_dir.x, 0, input_dir.y).rotated(Vector3.UP, cam_basis).normalized()
+	var up_down := Input.get_axis("swim_down", "swim_up")
+	var move_vec = Vector3(input_dir.x, up_down if is_in_fluid() else 0.0, input_dir.y)
+	
+	# Different movement modes when in water vs not in water
+	direction = move_vec.rotated(Vector3.UP, view_node.rotation.y if view_node else 0.0).normalized()
+	
 	var is_running:int = Input.is_action_pressed("run")
 	if direction:
 		velocity.x += direction.x * SPEED * (is_running + 1)
+		if is_in_fluid(): velocity.y += direction.y * SPEED * (is_running + 1)
 		velocity.z += direction.z * SPEED * (is_running + 1)
 	
-	energy -= (metabolism + Vector3(velocity.x, 0, velocity.z).length() * metabolism) * delta
+	energy -= (metabolism + Vector3(velocity.x, velocity.y if is_in_fluid() else 0.0, velocity.z).length() * metabolism) * delta
 	
-	# Apply slowing down of velocity
+	# Small bounce animation
+	# Guard: skip if this exact frame already set velocity.y via a jump above
+	if is_on_floor() and input_dir and not just_jumped:
+		velocity.y += BOUNCE_HEIGHT
+		bounce_active = true
+	
+	# Apply slowing down of horizontal velocity
 	velocity.x *= FRICTION
 	velocity.z *= FRICTION
 	
 	# Slow player if player need food
 	if energy < 50.0:
-		var energy_mult = clamp(energy * 0.02, 0.25, 1.0)
 		velocity.x *= energy_mult
 		velocity.z *= energy_mult
-
-	# Layer in knockback and let it decay over time
+	
+	# Layer in knockback from citizen and let it decay over time
 	if knockback.length() > 0.01:
-		velocity.x += knockback.x
-		velocity.z += knockback.z
+		velocity += knockback
 		knockback = knockback.move_toward(Vector3.ZERO, KNOCKBACK_FRICTION * delta)
 
 	# Tick down hit-immunity window
 	if invuln_timer > 0.0:
 		invuln_timer -= delta
-	
-	if energy < 0.01:
-		velocity.x = 0.0
-		velocity.z = 0.0
 	
 	Globals.set_player_energy(energy)
 	
@@ -107,10 +163,6 @@ func _physics_process(delta: float) -> void:
 	
 	move_and_slide()
 	_push_colliding_resource_props() # shared with citizen.gd, see carrier.gd -- must run AFTER move_and_slide() to read this frame's collisions
-	
-	if position.y < -10:
-		velocity = Vector3.ZERO
-		position = Vector3i(0, 1, 0)
 
 # Called by attackers (e.g. angry citizens). Ignored while invulnerable.
 func take_damage(amount: float, source_position: Vector3 = global_position, knockback_force: float = 4.0) -> void:
@@ -123,7 +175,6 @@ func take_damage(amount: float, source_position: Vector3 = global_position, knoc
 	
 	# Push the player directly away from whatever hit them
 	var push_dir = global_position - source_position
-	push_dir.y = 0
 	push_dir = push_dir.normalized() if push_dir.length() > 0.01 else Vector3.FORWARD
 	knockback = push_dir * knockback_force
 	velocity.y = max(velocity.y, 1.0)  # small upward pop on hit, tweak/remove to taste

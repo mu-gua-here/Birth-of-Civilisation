@@ -9,21 +9,21 @@ extends Node3D
 @onready var camera := $Camera as Camera3D
 
 # Zoom settings
-@export var max_zoom := 5.0
-@export var min_zoom := 0.1
+@export var max_zoom := 10.0
+@export var min_zoom := 1.5
 @export var scroll_zoom_speed := 5.0
-var zoom: float = 1.0
+var zoom: float = 3.0
 
 # Viewing settings
 @export var springarm_enabled := true
 @export var view_angle_restricted := true
 
 # Viewing / Sensitivity
-@export_range(0.1, 5.0) var mouse_sensitivity = 1.0
+@export_range(0.1, 5.0) var mouse_sensitivity = 0.5
 
 # Prevent hitting exact 0.0° and -90.0° singularities
-const max_tilt_limit := -0.1
-const min_tilt_limit := -89.9
+@export_range(-89.9, 89.9) var max_tilt_limit := 44.9
+@export_range(-179.9, 0.1) var min_tilt_limit := -89.9
 
 # Mouse/Camera Euler angles
 var camera_rotation: Vector3

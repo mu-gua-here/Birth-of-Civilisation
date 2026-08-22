@@ -1,17 +1,6 @@
 extends Node3D
 
-## Post-GridMap rewrite: structures are spawned as real, freely-positioned
-## scene instances (no cell snapping, no MeshLibrary/tile grid). Every placed
-## thing -- tree, hut, road segment -- lives in `placed_structures`, keyed by
-## a generated String id, with an explicit Vector3 `position`/float
-## `rotation_y` instead of a Vector3i cell.
-##
-## Gatherable structures (trees etc.) get NO floor collision of their own --
-## the LowPolyTerrain mesh owns the ground -- just a physical blocker + live
-## NavigationObstacle3D avoidance (same trick as the old per-cell tree
-## obstacle system, just keyed by id/position). Non-gatherable structures
-## (buildings, roads) get real static collision and contribute to the baked
-## navmesh, same as before.
+## Responsible for the construction and demolition of objects
 
 @export var structures: Array[Structure] = []
 
@@ -24,6 +13,12 @@ var index: int = 0 # Index of structure being built
 @export var view_camera: Camera3D # Used for raycasting mouse
 @export var citizen_scene: PackedScene
 @export var nav_region: NavigationRegion3D
+
+# Half-width (meters, from world origin) the navmesh bake should cover
+@export var worldSize: float = 500.0
+
+# Off by default: navmeshes are baked before runtime
+@export var auto_rebake_navmesh: bool = false
 
 var citizens = []
 
@@ -66,9 +61,6 @@ var plane: Plane # Used for raycasting mouse
 
 var interact_mode: bool = true  # Toggle between building and movement modes
 
-# World bounds -- used to size the nav-mesh bake AABB (see _bake_nav()).
-@export var worldSize: int = 25
-
 # Freeform placement tuning
 const NO_ID := ""
 const PLACEMENT_MIN_CLEARANCE := 1.0 # min distance from any existing placed structure to allow a new one
@@ -102,6 +94,13 @@ func _ready():
 	update_structure()
 	_build_resource_display()
 	spawn_citizens(5)
+
+	# Without this, the navmesh stays empty (see _bake_nav()) until the player places or
+	# removes their first building -- citizens would just wander in place, unable to path
+	# anywhere, from the moment they spawn. Only actually fires if auto_rebake_navmesh is
+	# on (see _request_nav_bake()) -- otherwise this is a no-op and your editor-baked
+	# navmesh is left alone.
+	_request_nav_bake()
 
 	# Initialise selector to match variable
 	interact_mode = !interact_mode
@@ -167,19 +166,58 @@ func _build_trimesh_collision_body(scene: PackedScene) -> StaticBody3D:
 	return body
 
 func _bake_nav():
-	if nav_region != null and nav_region.navigation_mesh != null:
-		nav_region.navigation_mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
-		nav_region.navigation_mesh.geometry_collision_mask = 1
+	if nav_region == null or nav_region.navigation_mesh == null:
+		return
 
-		var half_extent = float(worldSize) + 1.0  # small margin past the playable area
-		nav_region.navigation_mesh.filter_baking_aabb = AABB(
-			Vector3(-half_extent, -2.0, -half_extent),
-			Vector3(half_extent * 2.0, 4.0, half_extent * 2.0)
-		)
+	nav_region.navigation_mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
+	# Layer 1: ground layer
+	nav_region.navigation_mesh.geometry_collision_mask = 1
 
-		nav_region.bake_navigation_mesh(true)
+	var half_extent = worldSize + 1.0  # small margin past the playable area
+	if half_extent <= 1.0:
+		half_extent = _estimate_world_half_extent() + 1.0
+	nav_region.navigation_mesh.filter_baking_aabb = AABB(
+		Vector3(-half_extent, -2.0, -half_extent),
+		Vector3(half_extent * 2.0, 4.0, half_extent * 2.0)
+	)
+
+	# on_thread=true bakes off the main thread and only touches the navmesh once done,
+	# so a rebake triggered by chunk streaming doesn't stall gameplay for a frame.
+	nav_region.bake_navigation_mesh(true)
+
+func _estimate_world_half_extent() -> float:
+	if nav_region == null:
+		return 250.0
+	var terrain := _find_terrain_manager(nav_region)
+	if terrain == null or not ("world_chunks" in terrain):
+		return 250.0
+	var meters_per_chunk: float = float(terrain.chunk_size) * terrain.cell_size
+	return max(terrain.world_chunks.x, terrain.world_chunks.y) * meters_per_chunk * 0.5
+
+func _find_terrain_manager(root: Node) -> Node:
+	if root is LowPolyTerrainManager:
+		return root
+	for child in root.get_children():
+		var found := _find_terrain_manager(child)
+		if found:
+			return found
+	return null
+
+# Public entry point so anything else that changes the walkable world -- placing/removing
+# a structure, or a terrain chunk streaming in/out (see TerrainChunkLoader) -- can ask for
+# a rebake without duplicating the debounce logic below.
+func request_nav_bake() -> void:
+	_request_nav_bake()
 
 func _request_nav_bake():
+	# Single choke point for every automatic rebake trigger (initial _ready() call,
+	# structure placement/removal, map load, terrain chunk streaming). All of them just
+	# call this/request_nav_bake() unconditionally -- gating here means nobody else needs
+	# to remember the toggle exists. Off by default: see auto_rebake_navmesh's doc comment.
+	# Your editor-baked navmesh (with hand-tuned agent settings that correctly exclude the
+	# riverbank) is left completely alone unless this is switched on.
+	if not auto_rebake_navmesh:
+		return
 	_nav_bake_pending = true
 	_nav_bake_timer = NAV_BAKE_DELAY
 
@@ -192,7 +230,6 @@ func _process(delta):
 
 	action_save() # Saving
 	action_load() # Loading
-	action_load_resources() # Loading from resources
 
 	# Freeform placement position based on mouse -- raycasts against the
 	# y=0 plane. NOTE: the LowPolyTerrain addon exposes
@@ -565,14 +602,6 @@ func action_load():
 
 		print("Map loaded.")
 
-func action_load_resources():
-	if Input.is_action_just_pressed("load_resources"):
-		print("Loading prebuilt map...")
-
-		_load_from(ResourceLoader.load("res://sample map/map.res"))
-
-		print("Prebuilt map loaded...")
-
 func _load_from(loaded_map: DataMap) -> void:
 	_clear_all_placed_structures()
 
@@ -596,7 +625,6 @@ func spawn_citizens(count: int):
 		add_child(c)
 		# Spawn around player
 		c.global_position = Globals.get_player_position() + Vector3(randi_range(-10, 10), 0, randi_range(-10, 10))
-		print(c.global_position)
 		citizens.append(c)
 
 # --- Building occupancy (housing / jobs) ---------------------------------
@@ -836,6 +864,21 @@ func assign_builder_to_site(citizen_id: String, site_id: String) -> bool:
 func release_builder(citizen_id: String) -> void:
 	for site in construction_sites.values():
 		site.assigned_builders.erase(citizen_id)
+
+# Called from citizen.gd's _exit_tree() when a citizen is freed. Previously this had no
+# home on Builder at all -- citizen.gd was calling builder.release_citizen(data.id) behind
+# an `if builder.has_method(...)` guard that silently no-op'd forever, so freed citizens
+# never left `citizens`, never got dropped from any site's assigned_builders, and never
+# vacated housing -- a slow leak of stale entries that just happened to mostly go
+# unnoticed because is_instance_valid() checks elsewhere quietly skip them.
+func release_citizen(citizen_id: String) -> void:
+	release_builder(citizen_id)
+	for instance in buildings.values():
+		instance.residents.erase(citizen_id)
+	for i in range(citizens.size() - 1, -1, -1):
+		var c = citizens[i]
+		if not is_instance_valid(c) or (c.data != null and c.data.id == citizen_id):
+			citizens.remove_at(i)
 
 # --- Construction & gather progress visuals --------------------------------
 

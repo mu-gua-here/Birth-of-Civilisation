@@ -1,0 +1,117 @@
+[gd_scene format=3 uid="uid://b46ot7mrxlnks"]
+
+[ext_resource type="Script" uid="uid://ipal322soltq" path="res://addons/itch_uploader/ui/export_settings_modal/export_settings_modal.gd" id="1_fv8v2"]
+[ext_resource type="PackedScene" uid="uid://cov6r768i8og5" path="res://addons/itch_uploader/ui/path_picker/path_picker.tscn" id="2_rtaq1"]
+[ext_resource type="Texture2D" uid="uid://bjs63filx04ml" path="res://addons/itch_uploader/ui/icons/StatusWarning.svg" id="3_k4y2o"]
+
+[node name="ExportSettingsModal" type="Window" unique_id=481050269]
+oversampling_override = 1.0
+title = "Export and Upload Project to Itch"
+initial_position = 2
+size = Vector2i(600, 350)
+wrap_controls = true
+transient = true
+exclusive = true
+min_size = Vector2i(600, 350)
+script = ExtResource("1_fv8v2")
+
+[node name="BackgroundPanel" type="Panel" parent="." unique_id=1120154820]
+anchors_preset = -1
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="VBoxContainer" type="VBoxContainer" parent="BackgroundPanel" unique_id=878063295]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = 8.0
+offset_top = 8.0
+offset_right = -8.0
+offset_bottom = -8.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="GridContainer" type="GridContainer" parent="BackgroundPanel/VBoxContainer" unique_id=1231350413]
+layout_mode = 2
+size_flags_vertical = 3
+columns = 2
+
+[node name="ButlerPathLabel" type="Label" parent="BackgroundPanel/VBoxContainer/GridContainer" unique_id=721887188]
+layout_mode = 2
+text = "Butler path:"
+
+[node name="ButlerPathPicker" parent="BackgroundPanel/VBoxContainer/GridContainer" unique_id=172323263 instance=ExtResource("2_rtaq1")]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="PathEdit" parent="BackgroundPanel/VBoxContainer/GridContainer/ButlerPathPicker" index="0" unique_id=499450518]
+placeholder_text = "Auto detect"
+
+[node name="ExportPresetsLabel" type="Label" parent="BackgroundPanel/VBoxContainer/GridContainer" unique_id=1080035960]
+layout_mode = 2
+text = "Export presets:"
+
+[node name="ExportPresetsContainer" type="VBoxContainer" parent="BackgroundPanel/VBoxContainer/GridContainer" unique_id=1002293219]
+unique_name_in_owner = true
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="ExportPathWarningContainer" type="HBoxContainer" parent="BackgroundPanel/VBoxContainer" unique_id=1280448326]
+unique_name_in_owner = true
+layout_mode = 2
+
+[node name="CanceledStatusIcon" type="TextureRect" parent="BackgroundPanel/VBoxContainer/ExportPathWarningContainer" unique_id=623122277]
+unique_name_in_owner = true
+custom_minimum_size = Vector2(24, 24)
+layout_mode = 2
+tooltip_text = "Canceled"
+texture = ExtResource("3_k4y2o")
+expand_mode = 1
+stretch_mode = 5
+
+[node name="Label" type="Label" parent="BackgroundPanel/VBoxContainer/ExportPathWarningContainer" unique_id=478389175]
+custom_minimum_size = Vector2(500, 0)
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_colors/font_color = Color(1, 0.8666667, 0.39607844, 1)
+text = "Some export folders are located inside other export folders. This can lead to unwanted files being uploaded to Itch.io. Please check your export settings."
+autowrap_mode = 2
+
+[node name="ButtonsContainer" type="HBoxContainer" parent="BackgroundPanel/VBoxContainer" unique_id=1276897524]
+layout_mode = 2
+alignment = 1
+
+[node name="UploadButton" type="Button" parent="BackgroundPanel/VBoxContainer/ButtonsContainer" unique_id=1522060358]
+unique_name_in_owner = true
+layout_mode = 2
+text = "Export and Upload"
+
+[node name="CancelButton" type="Button" parent="BackgroundPanel/VBoxContainer/ButtonsContainer" unique_id=1026048642]
+layout_mode = 2
+text = "Cancel"
+
+[node name="ButlerErrorDialog" type="AcceptDialog" parent="." unique_id=102192119]
+unique_name_in_owner = true
+title = "Incorrect Butler Executable"
+initial_position = 2
+size = Vector2i(300, 132)
+popup_window = true
+min_size = Vector2i(300, 0)
+dialog_text = "The provided file does not exist or is not a valid Butler executable. Please choose a different one."
+dialog_autowrap = true
+
+[node name="NoPresetsDialog" type="AcceptDialog" parent="." unique_id=932644754]
+unique_name_in_owner = true
+size = Vector2i(248, 100)
+popup_window = true
+dialog_text = "No presets selected to export!"
+
+[connection signal="close_requested" from="." to="." method="_on_close_requested"]
+[connection signal="pressed" from="BackgroundPanel/VBoxContainer/ButtonsContainer/UploadButton" to="." method="_on_upload_button_pressed"]
+[connection signal="pressed" from="BackgroundPanel/VBoxContainer/ButtonsContainer/CancelButton" to="." method="_on_close_requested"]
+
+[editable path="BackgroundPanel/VBoxContainer/GridContainer/ButlerPathPicker"]

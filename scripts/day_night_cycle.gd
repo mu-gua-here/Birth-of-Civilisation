@@ -11,7 +11,8 @@ class_name DayNightCycle
 
 @export_group("General")
 ## How many real-world seconds a full in-game day takes.
-@export var day_length_seconds: float = 300.0
+@export var day_length_seconds: float = 600.0
+@export_range(0.0, 1.0) var time_of_day: float = 0.25
 ## Where the cycle starts, 0..1
 @export_range(0.0, 1.0) var start_time: float = 0.25
 
@@ -49,7 +50,9 @@ class_name DayNightCycle
 @export var noon_fog_density: float = 0.015
 @export var night_fog_density: float = 0.035
 
-var time_of_day: float = 0.0
+# Set by other scripts (view.gd) to stop this script's own fog lerp from
+# fighting theirs -- e.g. while the camera is underwater.
+var suppress_fog := false
 
 func _ready() -> void:
 	time_of_day = start_time
@@ -57,10 +60,14 @@ func _ready() -> void:
 
 
 func _process(delta: float) -> void:
-	if day_length_seconds <= 0.0:
+	# NOTE: `enabled` used to only gate whether time_of_day advances, while
+	# _apply() ran every frame regardless
+	if not enabled:
+		_apply(time_of_day)
 		return
-	if enabled:
-		time_of_day = fposmod(time_of_day + delta / day_length_seconds, 1.0)
+	if day_length_seconds <= 0.0:
+		day_length_seconds = 1.0
+	time_of_day = fposmod(time_of_day + delta / day_length_seconds, 1.0)
 	_apply(time_of_day)
 
 
@@ -99,5 +106,8 @@ func _apply(t: float) -> void:
 			sky_mat.sky_energy_multiplier = lerp(night_sky_energy, noon_sky_energy, day_pct)
 
 		# Fog reactivity -- thicker and bluer at night, thin and warm at noon.
-		env.fog_light_color = night_fog_color.lerp(noon_fog_color, day_pct)
-		env.fog_density = lerp(night_fog_density, noon_fog_density, day_pct)
+		# Skipped while suppress_fog is set (e.g. by view.gd while the camera's
+		# underwater) so day/night cycling doesn't fight the underwater tint.
+		if not suppress_fog:
+			env.fog_light_color = night_fog_color.lerp(noon_fog_color, day_pct)
+			env.fog_density = lerp(night_fog_density, noon_fog_density, day_pct)

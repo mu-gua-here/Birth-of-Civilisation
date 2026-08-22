@@ -1,6 +1,7 @@
 class_name CitizenData
 extends Node
 
+@export var id: String = "%06d" % randi_range(0, 999999)
 @export var citizen_name: String = NameGenerator.generate_name()
 @export var age: int = randi_range(2, 100)
 @export var health: float = 100.0

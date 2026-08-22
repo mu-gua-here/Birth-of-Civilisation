@@ -3,28 +3,6 @@ class_name Carrier
 
 ## Shared base for anything that can gather resources -- Player and Citizen
 ## both extend this instead of duplicating gathering-pipeline glue.
-##
-## Pushing resource props: Godot's CharacterBody3D does NOT automatically
-## transfer momentum to a RigidBody3D it walks into -- that's not built in,
-## in ANY engine's kinematic character controller, on ANY physics backend
-## (Jolt included) -- it just stops/slides against it like a wall unless you
-## explicitly detect the contact and apply an impulse yourself. That's what
-## _push_colliding_resource_props() does, called AFTER move_and_slide() so it
-## can read this frame's actual collisions -- the standard Godot pattern
-## (get_slide_collision_count()/get_slide_collision(i), same as the common
-## 2D CharacterBody2D-pushes-RigidBody2D tutorial). Push strength comes from
-## how fast THIS carrier is actually moving (velocity, not a flat constant)
-## -- and the carrier loses some of its own speed doing the shoving, same as
-## leaning into something heavy in real life.
-##
-## One guard kept on top of the plain tutorial version: contacts with a
-## near-vertical normal are skipped. A lying log is a cylinder, and near its
-## rounded top the contact normal points almost straight up -- Godot's own
-## floor-classification logic treats that shallow-angle contact more like
-## "floor to slide along" than "wall to push", which is exactly what caused
-## the earlier "sometimes I just slide off it, refuses to move" bug. Skipping
-## near-vertical normals means we only push on contacts that are actually
-## wall-like.
 
 const NORMAL_VERTICAL_SKIP := 0.7 # skip pushing if abs(normal.y) exceeds this -- see class comment
 const PUSH_TRANSFER := 1.4  # how much of our incoming speed passes into the prop as an impulse (scaled by the prop's own mass)
@@ -40,6 +18,14 @@ var builder: Node = null
 ## Carrier has no physical mass property of its own.
 const FLUID_MASS := 1.0
 @export var fluid_damp := 4.0
+
+## Scales the raw Archimedes force from FluidInteractor3D. At 1.0 the
+## carrier is fully buoyant and settles AT the surface (floats). Below 1.0
+## buoyancy no longer fully cancels gravity, so the carrier sinks -- slowly,
+## because fluid_damp still caps how fast velocity can build up, rather
+## than free-falling at normal gravity speed. Tuned for "sink gradually
+## toward the bottom" rather than "bob at the surface".
+@export var fluid_buoyancy_scale := 0.45
 @onready var fluid_interactor := FluidInteractor3D.new()
 
 # Call this from _ready() in the subclass (after add_to_group etc.) instead
@@ -59,13 +45,12 @@ func _carrier_ready() -> void:
 			fluid_interactor.add_collision_shape(collision)
 
 # Call once per physics frame, BEFORE gravity/movement is applied to
-# `velocity` -- adds buoyant float force and damps velocity while submerged,
-# same math as FloatableBody3D/FloatablePlayer3D just aimed at a
-# CharacterBody3D's `velocity` instead of a RigidBody3D's apply_force().
+# `velocity` -- adds buoyant float force and damps velocity while submerged.
+
 func _apply_buoyancy(delta: float) -> void:
 	fluid_interactor.process(global_transform, FLUID_MASS)
 	if not fluid_interactor.float_force.is_zero_approx():
-		velocity += fluid_interactor.float_force * delta
+		velocity += fluid_interactor.float_force * fluid_buoyancy_scale * delta * delta / FLUID_MASS
 		velocity += -velocity * fluid_damp * delta
 
 func is_in_fluid() -> bool:

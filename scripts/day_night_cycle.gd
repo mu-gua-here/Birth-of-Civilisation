@@ -54,6 +54,14 @@ class_name DayNightCycle
 # fighting theirs -- e.g. while the camera is underwater.
 var suppress_fog := false
 
+# Writing to ProceduralSkyMaterial properties forces Godot to re-bake the sky
+# radiance/reflection map that frame -- very expensive (measured ~23% of CPU
+# frame time on web export). day_pct barely changes frame-to-frame with a
+# multi-minute day length, so only push the update when it's moved enough to
+# actually be visible.
+var _last_sky_day_pct: float = -1.0
+const SKY_UPDATE_THRESHOLD := 0.002
+
 func _ready() -> void:
 	time_of_day = start_time
 	_apply(time_of_day)
@@ -98,12 +106,17 @@ func _apply(t: float) -> void:
 
 		# Sky reactivity -- only does anything when background_mode is Sky with a
 		# ProceduralSkyMaterial assigned (see the Sky export group above for why).
-		if env.sky and env.sky.sky_material is ProceduralSkyMaterial:
+		# Gated behind SKY_UPDATE_THRESHOLD: every write to a ProceduralSkyMaterial
+		# property forces a full sky radiance re-bake that frame, so we skip the
+		# write entirely unless day_pct has moved enough to be visible.
+		if env.sky and env.sky.sky_material is ProceduralSkyMaterial \
+				and absf(day_pct - _last_sky_day_pct) >= SKY_UPDATE_THRESHOLD:
 			var sky_mat: ProceduralSkyMaterial = env.sky.sky_material
 			sky_mat.sky_top_color = night_sky_top_color.lerp(noon_sky_top_color, day_pct)
 			sky_mat.sky_horizon_color = night_sky_horizon_color.lerp(noon_sky_horizon_color, day_pct)
 			sky_mat.ground_horizon_color = sky_mat.sky_horizon_color
 			sky_mat.sky_energy_multiplier = lerp(night_sky_energy, noon_sky_energy, day_pct)
+			_last_sky_day_pct = day_pct
 
 		# Fog reactivity -- thicker and bluer at night, thin and warm at noon.
 		# Skipped while suppress_fog is set (e.g. by view.gd while the camera's

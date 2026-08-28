@@ -26,7 +26,7 @@ var spawn_point:Vector3i
 
 # Player physical movement
 @export var SPEED: float = 0.5
-@export var JUMP_HEIGHT: float = 6.0
+@export var JUMP_HEIGHT: float = 5.0
 @export var SWIM_IMPULSE: float = 6.0
 @export var FRICTION: float = 0.8
 @export var WATER_RESISTANCE: float = 0.9

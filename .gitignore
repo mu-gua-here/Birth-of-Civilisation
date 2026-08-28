@@ -14,6 +14,7 @@
 # Native export templates & build artifacts
 *.pck
 export.cfg
+/export
 
 # Exported build artifacts (optional)
 *.exe
@@ -22,3 +23,4 @@ export.cfg
 *.aab
 *.x86_64
 *.wasm
+

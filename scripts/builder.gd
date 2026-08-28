@@ -6,6 +6,12 @@ extends Node3D
 
 var map: DataMap
 
+# Cached LowPolyTerrainManager, resolved lazily on first use (the scene tree may not
+# be fully ready the instant _ready() runs). Used to snap freeform placement/preview
+# to actual ground height -- see _get_terrain_height().
+var _terrain_manager: Node = null
+var _terrain_lookup_done := false
+
 var index: int = 0 # Index of structure being built
 
 @export var selector: Node3D # The 'cursor'
@@ -93,6 +99,19 @@ func _ready():
 
 	update_structure()
 	_build_resource_display()
+
+	# Initialise selector to match variable
+	interact_mode = !interact_mode
+	selector_container.visible = interact_mode
+	selector.visible = interact_mode
+
+	# Deferred: spawning citizens and the initial nav bake trigger are both one-time
+	# setup costs that used to land in this same _ready() frame alongside every OTHER
+	# node's own _ready()-time setup (both TerrainChunkLoaders' first catch-up sweep,
+	# TerrainOccluderSetup's mesh build) -- Godot calls every node's _ready() within the
+	# same frame during scene entry, so all of that was stacking into one frame-1 spike.
+	# Awaiting a frame first spreads this node's share of that cost onto frame 2 instead.
+	await get_tree().process_frame
 	spawn_citizens(5)
 
 	# Without this, the navmesh stays empty (see _bake_nav()) until the player places or
@@ -101,11 +120,6 @@ func _ready():
 	# on (see _request_nav_bake()) -- otherwise this is a no-op and your editor-baked
 	# navmesh is left alone.
 	_request_nav_bake()
-
-	# Initialise selector to match variable
-	interact_mode = !interact_mode
-	selector_container.visible = interact_mode
-	selector.visible = interact_mode
 
 func _generate_id() -> String:
 	_id_counter += 1
@@ -203,6 +217,29 @@ func _find_terrain_manager(root: Node) -> Node:
 			return found
 	return null
 
+# Resolves and caches the scene's LowPolyTerrainManager the first time it's needed,
+# searching from the current scene root rather than nav_region (which isn't always
+# wired up) -- same pattern as TerrainChunkLoader._find_terrain_manager().
+func _get_terrain_manager() -> Node:
+	if not _terrain_lookup_done:
+		_terrain_lookup_done = true
+		_terrain_manager = _find_terrain_manager(get_tree().current_scene)
+	return _terrain_manager
+
+# Snaps a flat y=0-plane raycast hit onto the real terrain surface. Building used to
+# place everything on a flat plane (see action_build's old comment); now that the
+# world has real LowPolyTerrain geometry, structures/the selector need to follow
+# actual ground height instead of floating at y=0 or burying into hills.
+func _get_terrain_height(pos: Vector3) -> float:
+	var terrain := _get_terrain_manager()
+	if terrain == null:
+		return pos.y
+	if terrain.has_method("is_inside_terrain") and not terrain.is_inside_terrain(pos.x, pos.z):
+		return pos.y # outside the authored terrain -- leave whatever height the plane gave us
+	if terrain.has_method("get_height_at_world_position"):
+		return terrain.get_height_at_world_position(pos)
+	return pos.y
+
 # Public entry point so anything else that changes the walkable world -- placing/removing
 # a structure, or a terrain chunk streaming in/out (see TerrainChunkLoader) -- can ask for
 # a rebake without duplicating the debounce logic below.
@@ -231,17 +268,19 @@ func _process(delta):
 	action_save() # Saving
 	action_load() # Loading
 
-	# Freeform placement position based on mouse -- raycasts against the
-	# y=0 plane. NOTE: the LowPolyTerrain addon exposes
-	# get_height_at_world_position()/is_inside_terrain(), which would let this
-	# follow real ground height instead of a flat plane -- left as a
-	# follow-up, not blocking this pass.
+	# Freeform placement position based on mouse -- raycasts against the y=0
+	# plane to get X/Z, then _get_terrain_height() below re-snaps Y onto the
+	# real LowPolyTerrain surface via get_height_at_world_position()/
+	# is_inside_terrain(), so placement follows actual ground height instead
+	# of a flat plane.
 	var world_position = plane.intersects_ray(
 		view_camera.project_ray_origin(get_viewport().get_mouse_position()),
 		view_camera.project_ray_normal(get_viewport().get_mouse_position()))
 
 	if world_position == null:
 		return
+
+	world_position.y = _get_terrain_height(world_position)
 
 	# Only show selector and process building in building mode
 	if interact_mode:
@@ -436,7 +475,10 @@ func get_structure_at_point(world_pos: Vector3, max_dist: float) -> String:
 func action_build(world_position: Vector3):
 	if Input.is_action_just_pressed("build"):
 
-		var place_pos := Vector3(round(world_position.x), 0, round(world_position.z))
+		if structures.is_empty():
+			return # nothing selectable -- see update_structure()'s guard
+
+		var place_pos := Vector3(round(world_position.x), world_position.y, round(world_position.z))
 
 		# Clearance check -- freeform has no "tile" to compare against, so
 		# just refuse if something's already too close.
@@ -530,6 +572,15 @@ func action_structure_toggle():
 # Update the structure visual in the 'cursor'
 
 func update_structure():
+	# Guard against an empty/corrupt structures array (e.g. a scene resource with a
+	# broken ext_resource dependency silently dropping entries) -- previously this
+	# indexed straight into structures[index] and crashed with an out-of-bounds
+	# error the moment _ready() called this with nothing to preview.
+	if structures.is_empty():
+		push_warning("Builder: structures array is empty -- nothing to build/preview. Check for broken resource references on the Builder node.")
+		return
+	index = clampi(index, 0, structures.size() - 1)
+
 	# Clear previous structure preview in selector
 	for n in selector_container.get_children():
 		selector_container.remove_child(n)

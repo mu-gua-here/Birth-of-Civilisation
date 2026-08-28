@@ -9,9 +9,9 @@
 [ext_resource type="PackedScene" uid="uid://filshn1wyhbe" path="res://scenes/terrain.res" id="5_jscy8"]
 [ext_resource type="Script" uid="uid://bh2rasf8hsopu" path="res://addons/floatable_body/fluid_area_3d.gd" id="6_yc10j"]
 [ext_resource type="Script" uid="uid://dec71yx4xpg2c" path="res://scripts/view.gd" id="8_yovpv"]
-[ext_resource type="Resource" uid="uid://hai5faxtwdf2" path="res://structures/tree.tres" id="9_ifw7y"]
-[ext_resource type="Resource" uid="uid://pfk8k6frgdt0" path="res://structures/ancient-wall.tres" id="13_ut2cy"]
+[ext_resource type="PackedScene" uid="uid://b2n3240eehfe5" path="res://models/ancient/wall.glb" id="12_yc10j"]
 [ext_resource type="Script" uid="uid://dn7i8yp68pgnm" path="res://tools/terrain_chunk_loader.gd" id="14_jscy8"]
+[ext_resource type="Script" uid="uid://6xforacudm0p" path="res://tools/terrain_occluder_setup.gd" id="14_occl"]
 [ext_resource type="FontFile" uid="uid://d0cxd77jybrcn" path="res://fonts/lilita_one_regular.ttf" id="16_vlub6"]
 [ext_resource type="PackedScene" uid="uid://cwik60akjhciu" path="res://scenes/citizen.tscn" id="18_og1vs"]
 [ext_resource type="Script" uid="uid://wlstv8x8ubp6" path="res://scripts/citizen_selector.gd" id="20_tel4y"]
@@ -69,9 +69,13 @@ clicks_required = 5
 energy_required = 0.5
 food_chance = 0.0
 
+[sub_resource type="Resource" id="Resource_jscy8"]
+script = ExtResource("2_54v6r")
+model = ExtResource("12_yc10j")
+happiness_bonus = 1.5
+
 [sub_resource type="SphereShape3D" id="SphereShape3D_2f3dj"]
-margin = 1.0
-radius = 0.1
+margin = 0.0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_jscy8"]
 size = Vector3(500, 250, 10)
@@ -100,7 +104,9 @@ environment = ExtResource("1_yndf3")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
+enabled = false
 time_of_day = 1.0
+start_time = 0.44
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
 noon_light_energy = 1.5
@@ -109,13 +115,26 @@ night_fog_density = 0.04
 
 [node name="Terrain" parent="." unique_id=179508897 instance=ExtResource("5_jscy8")]
 
-[node name="TerrainChunkLoader" type="Node" parent="." unique_id=433605953 node_paths=PackedStringArray("target", "camera")]
+[node name="LandChunkLoader" type="Node" parent="." unique_id=433605953 node_paths=PackedStringArray("target", "builder")]
 script = ExtResource("14_jscy8")
+terrain_group = "terrain_land"
+terrain_node_name = "Base"
 target = NodePath("../Player")
-camera = NodePath("../View/Camera")
-core_radius = 50.0
-frustum_fov_padding_degrees = 60.0
+builder = NodePath("../Builder")
+load_radius = 90.0
+unload_radius = 120.0
 metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
+
+[node name="OceanChunkLoader" type="Node" parent="." unique_id=1149238444 node_paths=PackedStringArray("target", "builder")]
+script = ExtResource("14_jscy8")
+terrain_group = "terrain_ocean"
+terrain_node_name = "Ocean"
+target = NodePath("../Player")
+builder = NodePath("../Builder")
+metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
+
+[node name="TerrainOccluderSetup" type="Node" parent="." unique_id=1149238445]
+script = ExtResource("14_occl")
 
 [node name="OceanFluid" type="Area3D" parent="." unique_id=1021674494]
 gravity_space_override = 1
@@ -136,7 +155,7 @@ mesh = SubResource("BoxMesh_2tfuy")
 
 [node name="Builder" type="Node3D" parent="." unique_id=837941451 node_paths=PackedStringArray("selector", "selector_container", "view_camera")]
 script = ExtResource("1_jybm7")
-structures = Array[ExtResource("2_54v6r")]([ExtResource("30_hut1"), SubResource("Resource_gqmmt"), ExtResource("9_ifw7y"), ExtResource("13_ut2cy")])
+structures = Array[ExtResource("2_54v6r")]([ExtResource("30_hut1"), SubResource("Resource_gqmmt"), SubResource("Resource_jscy8")])
 selector = NodePath("Selector")
 selector_container = NodePath("Selector/Container")
 view_camera = NodePath("../View/Camera")
@@ -162,6 +181,7 @@ target = NodePath("../Player")
 
 [node name="SpringArm3D" type="SpringArm3D" parent="View" unique_id=1199681696]
 transform = Transform3D(0.9999999, 0, 0, 0, 1.0000002, 1.7881393e-07, 0, 0, 0.9999999, 0, 0.1, 0)
+collision_mask = 2
 shape = SubResource("SphereShape3D_2f3dj")
 spring_length = 2.0
 margin = 0.5
@@ -170,6 +190,7 @@ margin = 0.5
 
 [node name="Camera" type="Camera3D" parent="View" unique_id=9040968]
 transform = Transform3D(-0.71933985, -0.07863768, 0.6901924, 0.3984392, 0.7671792, 0.5026749, -0.5690306, 0.6365948, -0.5205302, -2.5591154, 2.3570368, 27.521986)
+current = true
 
 [node name="CitizenSelector" type="Node3D" parent="." unique_id=1161909614 node_paths=PackedStringArray("view_camera")]
 script = ExtResource("20_tel4y")
@@ -205,6 +226,7 @@ debug_color = Color(0.4268808, 0.8921722, 0.9999998, 1)
 follow_viewport_enabled = true
 
 [node name="Top" type="Control" parent="CanvasLayer" unique_id=560779850]
+visible = false
 layout_mode = 3
 anchors_preset = 0
 offset_right = 40.0

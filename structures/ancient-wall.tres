@@ -1,9 +1,0 @@
-[gd_resource type="Resource" script_class="Structure" format=3 uid="uid://pfk8k6frgdt0"]
-
-[ext_resource type="PackedScene" uid="uid://b2n3240eehfe5" path="res://models/ancient/wall.glb" id="1"]
-[ext_resource type="Script" uid="uid://b4i7dfy6u3e8w" path="res://scripts/structure.gd" id="2"]
-
-[resource]
-script = ExtResource("2")
-model = ExtResource("1")
-happiness_bonus = 1.5

@@ -18,8 +18,9 @@ config/version="0.1.0"
 run/main_scene="uid://vgwrcfy1qawf"
 config/features=PackedStringArray("4.8", "Forward Plus")
 boot_splash/bg_color=Color(0.92549, 0.92549, 0.960784, 1)
-boot_splash/image="uid://bi2ahuqvd8tes"
-config/icon="uid://dykhca5xai53q"
+boot_splash/stretch_mode=4
+boot_splash/image="uid://bdjt0q1euolsr"
+config/icon="uid://uehkpiwbfjih"
 
 [autoload]
 
@@ -32,10 +33,6 @@ PolicyEngine="*res://scripts/policy_engine.gd"
 
 effort_schema=2
 
-[display]
-
-window/size/mode=4
-
 [editor]
 
 version_control/size/mode=4
@@ -44,7 +41,7 @@ version_control/default_cell_size=0.1
 
 [editor_plugins]
 
-enabled=PackedStringArray("res://addons/asset_placer/plugin.cfg", "res://addons/debug_menu/plugin.cfg", "res://addons/floatable_body/plugin.cfg", "res://addons/itch_uploader/plugin.cfg", "res://addons/lowpolyterrain/plugin.cfg", "res://addons/script-ide/plugin.cfg")
+enabled=PackedStringArray("res://addons/asset_placer/plugin.cfg", "res://addons/floatable_body/plugin.cfg", "res://addons/itch_uploader/plugin.cfg", "res://addons/lowpolyterrain/plugin.cfg", "res://addons/script-ide/plugin.cfg")
 
 [input]
 
@@ -884,6 +881,10 @@ player_jump={
 "script": null
 )]
 }
+
+[itch_uploader]
+
+itch_page_url="https://mu-gua-here.itch.io/civilisation-simulator"
 
 [navigation]
 

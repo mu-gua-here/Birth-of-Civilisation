@@ -24,6 +24,7 @@ var _baseline_ambient_energy: float
 func _ready():
 	if world_environment_node == null:
 		world_environment_node = $WorldEnvironment
+	_swap_environment_for_renderer()
 	# Run after DayNightCycle (default process_priority 0) so whenever we
 	# read the environment's "current" values this frame, they're already
 	# this frame's fresh day/night numbers, not last frame's.
@@ -67,6 +68,33 @@ func _process(_delta: float) -> void:
 	env.fog_light_color = _baseline_fog_color.lerp(underwater_fog_color, underwater_fog_blend)
 	env.fog_density = max(_baseline_fog_density, underwater_fog_density)
 	env.ambient_light_energy = _baseline_ambient_energy * underwater_ambient_multiplier
+
+func _swap_environment_for_renderer() -> void:
+	# Compatibility ("gl_compatibility") and Forward+ ("forward_plus") render
+	# fog/lighting/glow differently enough that one Environment resource
+	# use different environment files for each
+	if world_environment_node == null or world_environment_node.environment == null:
+		return
+	if RenderingServer.get_current_rendering_method() != "gl_compatibility":
+		return
+
+	var native_env := world_environment_node.environment
+	var native_path := native_env.resource_path
+	if native_path.is_empty() or not native_path.contains("native-"):
+		push_warning("main.gd: on Compatibility renderer but current environment resource path (%s) doesn't follow the 'native-*' naming convention -- can't derive compat path, leaving as-is." % native_path)
+		return
+
+	var compat_path := native_path.replace("native-", "compat-")
+	if not ResourceLoader.exists(compat_path):
+		push_warning("main.gd: expected compat environment at %s but it doesn't exist, leaving native environment active." % compat_path)
+		return
+
+	var compat_env := ResourceLoader.load(compat_path)
+	if compat_env == null or not (compat_env is Environment):
+		push_warning("main.gd: failed to load compat environment at %s, leaving native environment active." % compat_path)
+		return
+
+	world_environment_node.environment = compat_env
 
 func _query_camera_in_fluid(camera: Camera3D) -> bool:
 	var space_state := get_world_3d().direct_space_state

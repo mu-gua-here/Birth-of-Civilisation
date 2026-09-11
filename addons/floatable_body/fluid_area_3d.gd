@@ -1,5 +1,9 @@
 extends Area3D
-class_name FluidArea3D
+# class_name FluidArea3D  -- moved to scripts/fluid_area_3d.gd (forked fix for
+# the body_entered/body_exited typed-callable marshalling bug, godot#82572).
+# This addon copy is no longer used directly; OceanFluid's script in
+# main.tscn points at the fork instead. Kept here (unregistered) so a future
+# addon update doesn't silently resurrect a duplicate global class conflict.
 
 @export var density: float = 1.0
 @export var simulate_turbulence := true

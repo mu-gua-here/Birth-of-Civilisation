@@ -31,9 +31,9 @@ const FLUID_MASS := 1.0
 # Call this from _ready() in the subclass (after add_to_group etc.) instead
 # of duplicating the setup.
 func _carrier_ready() -> void:
-	builder = get_tree().get_first_node_in_group("builder")
+	builder = Globals.builder
 	# Trees live on their own physics layer (Builder.TREE_COLLISION_LAYER),
-	# separate from the GridMap's normal layer, so the static navmesh bake
+	# separate from the terrain's normal layer, so the static navmesh bake
 	# never has to see them (see Builder._spawn_tree_obstacle()). That means
 	# we have to explicitly opt in to colliding with that layer here, or
 	# standing trees would stop physically blocking movement entirely.
@@ -49,7 +49,12 @@ func _carrier_ready() -> void:
 
 func _apply_buoyancy(delta: float) -> void:
 	fluid_interactor.process(global_transform, FLUID_MASS)
-	if not fluid_interactor.float_force.is_zero_approx():
+	# Gated on fluid_buoyancy_scale too, not just float_force -- float_force is raw
+	# Archimedes physics and is non-zero any time we're submerged at all, regardless of
+	# fluid_buoyancy_scale. Without this second check, setting the scale to 0 to test "no
+	# buoyancy" still ran the damping line below every frame, which fights gravity on its
+	# own and made the scale look like it was doing nothing.
+	if not fluid_interactor.float_force.is_zero_approx() and fluid_buoyancy_scale > 0.0:
 		velocity += fluid_interactor.float_force * fluid_buoyancy_scale * delta * delta / FLUID_MASS
 		velocity += -velocity * fluid_damp * delta
 

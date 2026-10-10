@@ -25,6 +25,9 @@ uniform float wave_speed : hint_range(0.1, 60.0) = 1.0;
 uniform float wave_scale : hint_range(0.05, 2.0) = 0.2;
 uniform float wave_height : hint_range(0.0, 5.0) = 0.1;
 uniform float low_poly_stepping : hint_range(1.0, 12.0) = 12.0;
+// Wave clock override. FluidArea3D writes its own time here so the GDScript height query and
+// this shader animate in lockstep; negative means "not driven", fall back to TIME.
+uniform float sync_time = -1.0;
 
 group_uniforms Depth_Settings;
 uniform float foam_distance : hint_range(0.001, 1.0, 0.001) = 0.05;
@@ -92,7 +95,7 @@ float low_poly_wave(vec2 uv, float time) {
 
 void vertex() {
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float height = low_poly_wave(world_pos.xz, TIME);
+	float height = low_poly_wave(world_pos.xz, sync_time >= 0.0 ? sync_time : TIME);
 	VERTEX.y += height;
 }
 

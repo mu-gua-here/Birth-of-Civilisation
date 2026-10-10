@@ -25,6 +25,7 @@ func _ready():
 	if world_environment_node == null:
 		world_environment_node = $WorldEnvironment
 	_swap_environment_for_renderer()
+	_apply_web_quality()
 	# Run after DayNightCycle (default process_priority 0) so whenever we
 	# read the environment's "current" values this frame, they're already
 	# this frame's fresh day/night numbers, not last frame's.
@@ -36,6 +37,7 @@ func _ready():
 		_baseline_ambient_energy = env.ambient_light_energy
 
 func _process(_delta: float) -> void:
+	_dbg_fps_tick(_delta)
 	if world_environment_node == null or world_environment_node.environment == null:
 		return
 	var camera := view.get_node_or_null("Camera") if view else null
@@ -68,6 +70,69 @@ func _process(_delta: float) -> void:
 	env.fog_light_color = _baseline_fog_color.lerp(underwater_fog_color, underwater_fog_blend)
 	env.fog_density = max(_baseline_fog_density, underwater_fog_density)
 	env.ambient_light_energy = _baseline_ambient_energy * underwater_ambient_multiplier
+
+# --- Debug perf A/B (debug builds only). Stand where fps drops, press one key at a time:
+#   F1 3D render scale 1.0/0.75/0.5   F2 shadow splits 1/2/4   F3 MSAA on/off
+#   F4 hide/show Ocean                F5 print fps once a second
+var _dbg_scale_i := 0
+var _dbg_fps_log := false
+var _dbg_fps_t := 0.0
+
+func _dbg_fps_tick(delta: float) -> void:
+	if not _dbg_fps_log:
+		return
+	_dbg_fps_t += delta
+	if _dbg_fps_t >= 1.0:
+		_dbg_fps_t = 0.0
+		print("[perf] %d fps (%.1f ms)" % [Engine.get_frames_per_second(), 1000.0 / maxf(Engine.get_frames_per_second(), 1.0)])
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not OS.is_debug_build() or not (event is InputEventKey and event.pressed and not event.echo):
+		return
+	var vp := get_viewport()
+	match event.keycode:
+		KEY_F1:
+			_dbg_scale_i = (_dbg_scale_i + 1) % 3
+			vp.scaling_3d_scale = [1.0, 0.75, 0.5][_dbg_scale_i]
+			print("[perf] 3D scale = ", vp.scaling_3d_scale)
+		KEY_F2:
+			var sun := get_node_or_null("Sun") as DirectionalLight3D
+			if sun:
+				# ORTHOGONAL(1 split) -> PARALLEL_2_SPLITS -> PARALLEL_4_SPLITS
+				sun.directional_shadow_mode = ((int(sun.directional_shadow_mode) + 1) % 3) as DirectionalLight3D.ShadowMode
+				print("[perf] shadow mode = ", ["1 split", "2 splits", "4 splits"][int(sun.directional_shadow_mode)])
+		KEY_F3:
+			vp.msaa_3d = Viewport.MSAA_2X if vp.msaa_3d == Viewport.MSAA_DISABLED else Viewport.MSAA_DISABLED
+			print("[perf] MSAA = ", "2x" if vp.msaa_3d == Viewport.MSAA_2X else "off")
+		KEY_F4:
+			var ocean := find_child("Ocean", true, false) as Node3D
+			if ocean:
+				ocean.visible = not ocean.visible
+				print("[perf] Ocean visible = ", ocean.visible)
+		KEY_F5:
+			_dbg_fps_log = not _dbg_fps_log
+
+func _apply_web_quality() -> void:
+	# Shadow bias applies everywhere: the stripes on gentle terrain slopes are shadow acne (the
+	# surface shadowing itself because the depth comparison is too tight), fixed by pushing the
+	# receiver out along its normal. Tune these two in code or per-light in the inspector.
+	var sun := get_node_or_null("Sun") as DirectionalLight3D
+	if sun:
+		sun.shadow_bias = 0.1
+		sun.shadow_normal_bias = 3.0
+
+	# Web/WebGL2 is far more fill-rate and draw-call bound than native. Everything below is
+	# web-only; native keeps its project settings untouched.
+	if not OS.has_feature("web"):
+		return
+	# MSAA on a HiDPI (retina) canvas is one of the biggest fill-rate costs in a browser.
+	get_viewport().msaa_3d = Viewport.MSAA_DISABLED
+	# Each PSSM split re-renders every shadow caster; the default is 4. Two splits over a
+	# shorter distance is much cheaper for a third-person camera this close to the ground.
+	if sun:
+		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
+		sun.directional_shadow_max_distance = 80.0
+	RenderingServer.directional_shadow_atlas_set_size(4096, true)
 
 func _swap_environment_for_renderer() -> void:
 	# Compatibility ("gl_compatibility") and Forward+ ("forward_plus") render
@@ -104,6 +169,12 @@ func _query_camera_in_fluid(camera: Camera3D) -> bool:
 	params.collide_with_bodies = false
 	var hits := space_state.intersect_point(params, 4)
 	for hit in hits:
-		if hit.get("collider") is FluidArea3D:
-			return true
+		var collider = hit.get("collider")
+		if collider is FluidArea3D:
+			# The Area3D shape is only a coarse trigger volume (much taller than the real
+			# water -- see FluidArea3D's own class comment), so being inside IT isn't the
+			# same as being underwater. Compare against the actual sculpted/waved surface
+			# height instead, or the overlay shows far above where the water really is.
+			if camera.global_position.y <= collider.get_height(camera.global_position):
+				return true
 	return false

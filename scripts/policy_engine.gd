@@ -151,20 +151,10 @@ func _get_citizen_approval(citizen): return citizen.data.approval
 
 # BuildingInstance doesn't carry a back-reference to its Structure, so these
 # getters need the owning Builder to resolve structure_index -> Structure.
-# We resolve it lazily via the "builder" group (Builder already calls
-# add_to_group("builder") in _ready) rather than threading a builder
-# reference through every BuildingInstance. Cached after first lookup since
-# there's exactly one Builder for the lifetime of a game session.
-var _builder_cache: Node = null
-
+# We resolve it through Globals.builder (registered by Builder._ready) rather
+# than threading a builder reference through every BuildingInstance.
 func _builder():
-	if _builder_cache != null and is_instance_valid(_builder_cache):
-		return _builder_cache
-	var tree = get_tree()
-	if tree == null:
-		return null
-	_builder_cache = tree.get_first_node_in_group("builder")
-	return _builder_cache
+	return Globals.builder
 
 func _get_building_type(instance: BuildingInstance):
 	var b = _builder()

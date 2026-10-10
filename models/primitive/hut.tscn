@@ -1,0 +1,25 @@
+[gd_scene format=3 uid="uid://d4dcswr16uxpi"]
+
+[ext_resource type="PackedScene" uid="uid://bi5pf7l1o3s6i" path="res://models/primitive/hut.glb" id="1_oq8x0"]
+[ext_resource type="Texture2D" uid="uid://k6f5xxl8mufc" path="res://models/primitive/Textures/colormap.png" id="2_630ip"]
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_jb7ow"]
+cull_mode = 2
+albedo_texture = ExtResource("2_630ip")
+
+[node name="hut" unique_id=883484486 instance=ExtResource("1_oq8x0")]
+
+[node name="Cone" parent="." index="0" unique_id=663612473]
+surface_material_override/0 = SubResource("StandardMaterial3D_jb7ow")
+
+[node name="grass" parent="." index="1" unique_id=1244711823]
+surface_material_override/0 = SubResource("StandardMaterial3D_jb7ow")
+
+[node name="Torus_001" parent="." index="2" unique_id=2010763137]
+surface_material_override/0 = SubResource("StandardMaterial3D_jb7ow")
+
+[node name="Dirt" parent="." index="3" unique_id=1628610002]
+surface_material_override/0 = SubResource("StandardMaterial3D_jb7ow")
+
+[node name="Cylinder" parent="." index="4" unique_id=851815280]
+surface_material_override/0 = SubResource("StandardMaterial3D_jb7ow")

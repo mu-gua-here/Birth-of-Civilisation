@@ -125,9 +125,16 @@ void vertex() {
 }
 
 void fragment() {
-	// 1. Force flat face normals
-	vec3 face_normal = normalize(cross(dFdy(VERTEX), dFdx(VERTEX)));
-	NORMAL = face_normal;
+	// 1. Force flat face normals.
+	// On a triangle's edge pixels the screen-space derivatives can straddle a neighbouring
+	// triangle (or a helper pixel), making the cross product ~0. normalize(0) is NaN, and a NaN
+	// normal lights the pixel black. MSAA hides it by resolving edges from several samples;
+	// without MSAA it shows as black pixels along the wave edges. Only use the derived normal
+	// when it is valid, otherwise keep the interpolated one.
+	vec3 face_cross = cross(dFdy(VERTEX), dFdx(VERTEX));
+	if (dot(face_cross, face_cross) > 1e-12) {
+		NORMAL = normalize(face_cross);
+	}
 	
 	// 2. Depth calculation
 	//

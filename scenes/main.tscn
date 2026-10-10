@@ -2,24 +2,26 @@
 
 [ext_resource type="Script" uid="uid://ce6sixkgkcpti" path="res://scenes/main.gd" id="1_2f3dj"]
 [ext_resource type="Script" uid="uid://76g8ejmdibal" path="res://scripts/builder.gd" id="1_jybm7"]
-[ext_resource type="Environment" uid="uid://jbptgqvstei3" path="res://environments/native-main-environment.tres" id="1_yndf3"]
 [ext_resource type="Script" uid="uid://b4i7dfy6u3e8w" path="res://scripts/structure.gd" id="2_54v6r"]
 [ext_resource type="PackedScene" uid="uid://dqlr0bede3xqd" path="res://scenes/player.tscn" id="2_jscy8"]
+[ext_resource type="Environment" uid="uid://jbptgqvstei3" path="res://environments/native-main-environment.tres" id="3_gqmmt"]
 [ext_resource type="Texture2D" uid="uid://cbk07cxgshg26" path="res://sprites/selector.png" id="4_wr1wv"]
 [ext_resource type="PackedScene" uid="uid://filshn1wyhbe" path="res://scenes/terrain.res" id="5_jscy8"]
-[ext_resource type="Script" uid="uid://b3g1i41ti7blf" path="res://scripts/fluid_area_3d.gd" id="6_yc10j"]
+[ext_resource type="PackedScene" uid="uid://d1sw4502ux10j" path="res://models/primitive/boat.tscn" id="7_gqmmt"]
 [ext_resource type="Script" uid="uid://dec71yx4xpg2c" path="res://scripts/view.gd" id="8_yovpv"]
 [ext_resource type="PackedScene" uid="uid://b2n3240eehfe5" path="res://models/ancient/wall.glb" id="12_yc10j"]
 [ext_resource type="Script" uid="uid://dn7i8yp68pgnm" path="res://tools/terrain_chunk_loader.gd" id="14_jscy8"]
 [ext_resource type="FontFile" uid="uid://d0cxd77jybrcn" path="res://fonts/lilita_one_regular.ttf" id="16_vlub6"]
 [ext_resource type="PackedScene" uid="uid://cwik60akjhciu" path="res://scenes/citizen.tscn" id="18_og1vs"]
 [ext_resource type="Script" uid="uid://wlstv8x8ubp6" path="res://scripts/citizen_selector.gd" id="20_tel4y"]
-[ext_resource type="PackedScene" uid="uid://c14kb754um6jv" path="res://models/primitive/boat.scn" id="22_jscy8"]
 [ext_resource type="Texture2D" uid="uid://ciwbdik3tmxtp" path="res://sprites/instructions.png" id="22_pm3ni"]
 [ext_resource type="AudioStream" uid="uid://wvfsgkl8qob6" path="res://sounds/ambience.ogg" id="24_y6deb"]
 [ext_resource type="Texture2D" uid="uid://cq3ph17sfdegf" path="res://sprites/log-icon.png" id="25_fv21b"]
 [ext_resource type="Script" uid="uid://c6187ysfly3rv" path="res://scripts/day_night_cycle.gd" id="29_fv21b"]
-[ext_resource type="Resource" uid="uid://dtt3xgdnpvfso" path="res://structures/hut.tres" id="30_hut1"]
+[ext_resource type="Script" uid="uid://b3g1i41ti7blf" path="res://scripts/fluid_area_3d.gd" id="31_ocean"]
+
+[sub_resource type="BoxShape3D" id="BoxShape3D_ocean"]
+size = Vector3(500, 100, 500)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
 top_radius = 0.08
@@ -72,11 +74,6 @@ happiness_bonus = 1.5
 margin = 0.0
 radius = 0.25
 
-[sub_resource type="BoxShape3D" id="BoxShape3D_pm3ni"]
-size = Vector3(480, 65, 480)
-
-[sub_resource type="BoxMesh" id="BoxMesh_2tfuy"]
-
 [sub_resource type="BoxShape3D" id="BoxShape3D_jscy8"]
 size = Vector3(500, 250, 10)
 
@@ -93,29 +90,28 @@ underwater_fog_density = 0.1
 underwater_fog_blend = 0.273
 
 [node name="Player" parent="." unique_id=1514412654 node_paths=PackedStringArray("view_node") instance=ExtResource("2_jscy8")]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.2, 100, -66.118)
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.2, 6.0164056, -66.118)
 view_node = NodePath("../View")
-SWIM_IMPULSE = 10.0
-fluid_damp = 10.0
-fluid_buoyancy_scale = 0.2
+JUMP_HEIGHT = 7.0
+fluid_damp = 15.0
+fluid_buoyancy_scale = 0.15
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=558144835]
-environment = ExtResource("1_yndf3")
+environment = ExtResource("3_gqmmt")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
-enabled = false
-day_length_seconds = 60.0
-start_time = 0.5
+time_of_day = 1.0
+start_time = 0.3
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
 horizon_light_energy = 2.0
-night_light_energy = 0.25
+moon_light_energy = 0.05
+moon_shadows = true
 noon_sky_energy = 1.5
 night_sky_energy = 1.0
 night_fog_color = Color(0.052878626, 0.05904805, 0.10227851, 1)
 noon_fog_density = 0.02
-night_fog_density = 0.05
 
 [node name="Terrain" parent="." unique_id=179508897 instance=ExtResource("5_jscy8")]
 
@@ -137,13 +133,21 @@ load_radius = 160.0
 unload_radius = 200.0
 metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
 
-[node name="Boat" parent="." unique_id=322618501 instance=ExtResource("22_jscy8")]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 21.0859, -1.2899132, -72.64583)
-metadata/asset_placer_res_id = "uid://c14kb754um6jv"
+[node name="Boat" parent="." unique_id=322618501 instance=ExtResource("7_gqmmt")]
+transform = Transform3D(1, 0, 0, 0, 0.9721717, 0.23426932, 0, -0.23426932, 0.9721717, 0, 3.5317965, -74.851494)
+
+[node name="OceanFluid" type="Area3D" parent="." unique_id=2141772413]
+collision_layer = 4
+script = ExtResource("31_ocean")
+wave_height = 1.0
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="OceanFluid" unique_id=239001658]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -40, 0)
+shape = SubResource("BoxShape3D_ocean")
 
 [node name="Builder" type="Node3D" parent="." unique_id=837941451 node_paths=PackedStringArray("selector", "selector_container", "view_camera")]
 script = ExtResource("1_jybm7")
-structures = Array[ExtResource("2_54v6r")]([ExtResource("30_hut1"), SubResource("Resource_gqmmt"), SubResource("Resource_jscy8")])
+structures = Array[ExtResource("2_54v6r")]([SubResource("Resource_gqmmt"), SubResource("Resource_jscy8")])
 selector = NodePath("Selector")
 selector_container = NodePath("Selector/Container")
 view_camera = NodePath("../View/Camera")
@@ -166,6 +170,7 @@ shadow_opacity = 0.75
 transform = Transform3D(0.707107, -0.40558, 0.579228, 0, 0.819152, 0.573576, -0.707107, -0.40558, 0.579228, 0, -1, 0)
 script = ExtResource("8_yovpv")
 target = NodePath("../Player")
+wheel_rotate_sensitivity = 1.0
 
 [node name="SpringArm3D" type="SpringArm3D" parent="View" unique_id=1199681696]
 transform = Transform3D(0.9999999, 0, 0, 0, 1.0000002, 1.7881393e-07, 0, 0, 0.9999999, 0, 0.1, 0)
@@ -179,19 +184,6 @@ margin = 0.5
 [node name="Camera" type="Camera3D" parent="View" unique_id=9040968]
 transform = Transform3D(-0.71933985, -0.07863768, 0.6901924, 0.3984392, 0.7671792, 0.5026749, -0.5690306, 0.6365948, -0.5205302, -2.5591154, 2.3570368, 27.521986)
 current = true
-
-[node name="Ocean" type="Area3D" parent="." unique_id=1234607151]
-script = ExtResource("6_yc10j")
-metadata/_custom_type_script = "uid://b3g1i41ti7blf"
-
-[node name="CollisionShape3D" type="CollisionShape3D" parent="Ocean" unique_id=1033838844]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -32, 0)
-shape = SubResource("BoxShape3D_pm3ni")
-debug_color = Color(0, 0.54509807, 0.6431373, 1)
-
-[node name="MeshInstance3D" type="MeshInstance3D" parent="Ocean/CollisionShape3D" unique_id=1252184327]
-transform = Transform3D(480, 0, 0, 0, 65, 0, 0, 0, 480, 0, 0, 0)
-mesh = SubResource("BoxMesh_2tfuy")
 
 [node name="CitizenSelector" type="Node3D" parent="." unique_id=1161909614 node_paths=PackedStringArray("view_camera")]
 script = ExtResource("20_tel4y")
@@ -218,6 +210,10 @@ debug_color = Color(0.4268808, 0.8921722, 0.9999998, 1)
 transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 250, 50, 0)
 shape = SubResource("BoxShape3D_jscy8")
 debug_color = Color(0.4268808, 0.8921722, 0.9999998, 1)
+
+[node name="Trees" type="Node3D" parent="." unique_id=30058757]
+
+[node name="MultiMeshInstance3D" type="MultiMeshInstance3D" parent="Trees" unique_id=145539410]
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=327302228]
 follow_viewport_enabled = true

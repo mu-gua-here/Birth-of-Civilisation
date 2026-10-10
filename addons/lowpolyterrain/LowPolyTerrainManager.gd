@@ -116,6 +116,12 @@ var cell_size: float = 1.0
 @export var show_deactivated_chunks: bool = true:
 	set(v): show_deactivated_chunks = v; _queue_setup()
 
+## When enabled (default), flat areas are merged into large triangles to save geometry.
+## Disable for water: its shader displaces vertices, so merged triangles flatten the waves
+## and the rendered surface no longer matches the surface queried by FluidArea3D.
+@export var decimate_flat_areas: bool = true:
+	set(v): decimate_flat_areas = v; _queue_setup()
+
 	
 # REAL INSPECTOR BUTTONS: Resolved via safe Lambda Callables to prevent early parsing errors
 ## Click to process and apply changes made to World Chunks, Chunk Size, or Cell Size.
@@ -703,8 +709,14 @@ func set_chunk_status_in_radius(center_pos: Vector3, activate: bool) -> void:
 
 					# Direct update of the changed without global rebuild
 					var coord := Vector2i(cx, cz)
-					if _has_chunk(coord):
-						_update_single_chunk(coord)
+					# NOTE: deliberately unconditional -- do not gate this behind _has_chunk(coord).
+					# A chunk that started deactivated (e.g. world edges never active at scene load)
+					# never gets a ChunkRecord/LowPolyTerrainChunk built for it, so _has_chunk() would
+					# return false forever and this reactivation would silently never take effect.
+					# Both backends' _update_single_chunk() already handle a coord with no existing
+					# record correctly (SERVERS self-heals via ensure_chunk() inside update_chunk()),
+					# so there's nothing this guard was protecting against.
+					_update_single_chunk(coord)
 
 
 
@@ -2356,7 +2368,25 @@ func _update_single_chunk(coord: Vector2i) -> void:
 		return
 
 	if not chunks_dict.has(coord):
-		return
+		# At the initial build (see the "AT RUNTIME: Only add chunk to dict if active" pass
+		# above) a chunk that starts deactivated never gets a LowPolyTerrainChunk node built
+		# for it outside the editor, so chunks_dict has no entry for it. Silently returning
+		# here used to mean a chunk activated later at runtime (e.g. by TerrainChunkLoader as
+		# the player approaches) never actually got a mesh/collision node -- the activity byte
+		# flipped, but nothing was ever built to show for it. Build one lazily now instead,
+		# mirroring the SERVERS backend's self-healing ensure_chunk() (see update_chunk()).
+		if not is_chunk_active(coord.x, coord.y):
+			return
+		var new_chunk := LowPolyTerrainChunk.new()
+		new_chunk.name = "Chunk_%d_%d" % [coord.x, coord.y]
+		new_chunk.chunk_coord = coord
+		add_child(new_chunk)
+		chunks_dict[coord] = new_chunk
+		chunks_dict[coord].position = Vector3(
+			float(coord.x * chunk_size) * cell_size,
+			0.0,
+			float(-coord.y * chunk_size) * cell_size
+		)
 	var chunk: LowPolyTerrainChunk = chunks_dict[coord]
 	if not chunk:
 		return
@@ -2371,6 +2401,11 @@ func _update_single_chunk(coord: Vector2i) -> void:
 			chunk.mesh = _get_deactivated_preview_mesh()
 			chunk.material_override = _get_deactivated_preview_material()
 
+		# The one-shot "Bake Live Collisions" editor button is the ONLY thing that has ever
+		# created these colliders; deactivating a chunk here never removed its (possibly
+		# stale, possibly nonexistent) one. Clear it so a deactivated chunk can't leave an
+		# invisible wall behind.
+		_sync_chunk_collision(chunk, false)
 		return
 
 	chunk.visible = true
@@ -2393,9 +2428,87 @@ func _update_single_chunk(coord: Vector2i) -> void:
 		chunk_local_heights, jitter_strength,
 		jitter_slope_threshold, custom_material,
 		extract_chunk_paint(coord), PAINT_STEPS,
-		get_active_paint_material()
+		get_active_paint_material(),
+		decimate_flat_areas
 	)
 
+	# See the doc comment on _sync_chunk_collision() -- runtime (re)activation (e.g. via
+	# TerrainChunkLoader) rebuilt the VISUAL mesh above, but under MESH_NODES that was never
+	# enough on its own: collision has always been a separate, one-shot, editor-only "Bake
+	# Live Collisions" pass with no awareness of chunks (de)activating afterwards. Without
+	# this call, a chunk reactivated after the initial bake looks like land but has nothing
+	# to stand on.
+	_sync_chunk_collision(chunk, true)
+
+
+## Runtime counterpart to _bake_live_collisions_as_child()'s one-shot editor "Bake Live
+## Collisions" button: keeps ONE chunk's collider in sync with its current activation state,
+## instead of only ever getting collision from that manual, whole-terrain, editor-only pass.
+## Mirrors it closely on purpose -- reparents the baked StaticBody3D out of the chunk and into
+## the same shared "<manager_name>_Collisions" sibling container, with the same global
+## transform fix-up, collision_layer/collision_mask/collision_group -- so a collider built here
+## at runtime is indistinguishable from one built by that editor pass.
+func _sync_chunk_collision(chunk: LowPolyTerrainChunk, active: bool) -> void:
+	if terrain_backend == TerrainBackend.SERVERS:
+		return # PhysicsServer3D collision is registered directly by the server backend.
+
+	var collision_root := _get_or_create_collision_container()
+	if collision_root == null:
+		return
+
+	# Always clear any previous collider for this chunk first -- covers both "deactivating,
+	# remove it" and "reactivating after a height/paint change, don't leave a stale copy".
+	var existing: Node = collision_root.find_child("Static_" + chunk.name, false, false)
+	if existing:
+		existing.free()
+
+	if not active or chunk.mesh == null:
+		return
+
+	chunk.bake_collision(null)
+	var static_body: StaticBody3D = chunk.find_child(
+		"Static_" + chunk.name, false, false
+	) as StaticBody3D
+	if static_body == null:
+		return
+	chunk.remove_child(static_body)
+	collision_root.add_child(static_body)
+
+	# See the matching comment in _bake_live_collisions_as_child(): the body was built as a
+	# child of the chunk (inheriting the manager's orientation for free) and now needs the
+	# WHOLE transform carried across the reparent, not just its origin, or a tilted terrain
+	# ends up with axis-aligned colliders stair-stepping down the slope.
+	var half_bounds: float = (float(chunk_size) * cell_size) / 2.0
+	var center_offset := Vector3(half_bounds, 0.0, -half_bounds)
+	static_body.global_transform = Transform3D(
+		chunk.global_transform.basis,
+		chunk.global_transform * center_offset
+	)
+
+	for grp in static_body.get_groups():
+		static_body.remove_from_group(grp)
+	static_body.collision_layer = collision_layer
+	static_body.collision_mask = 0
+	if not collision_group.strip_edges().is_empty():
+		static_body.add_to_group(collision_group, true)
+
+
+## Finds (or, at runtime, creates) the shared collision container sibling that both the
+## manual editor bake and _sync_chunk_collision() above reparent colliders into, keyed by
+## name so both agree on the same node.
+func _get_or_create_collision_container() -> Node3D:
+	var target_parent: Node = get_parent()
+	if target_parent == null:
+		return null
+	var dynamic_collision_name: String = name + "_Collisions"
+	var container := target_parent.find_child(dynamic_collision_name, false, false) as Node3D
+	if container == null:
+		container = Node3D.new()
+		container.name = dynamic_collision_name
+		target_parent.add_child(container)
+		if Engine.is_editor_hint() and get_tree() and get_tree().edited_scene_root:
+			container.set_owner(get_tree().edited_scene_root)
+	return container
 
 
 

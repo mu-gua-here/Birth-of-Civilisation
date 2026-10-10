@@ -18,7 +18,6 @@ dest_files=["res://.godot/imported/colormap.png-b0f96bf321a04288fdf95c51e0262c09
 
 compress/mode=2
 compress/high_quality=false
-compress/high_quality_mode=0
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0

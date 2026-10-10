@@ -48,11 +48,16 @@ func process(transform: Transform3D, mass: float = 1.0, gravity_scale: float = 1
 	var sum_weights := 0.0
 	var max_diff := 0.0
 	var min_diff := 1000000.0
+	# Floater radii are authored in the body's local units but positions go through the full
+	# transform, so a scaled body (e.g. the 0.5-scale Player) must scale the radius too, or the
+	# floaters extend far below the real collider and the body rides too high.
+	var radius_scale: float = transform.basis.get_scale().y
 	for floater in floaters:
 		var floater_position = transform * floater.position
+		var world_radius: float = floater.radius * radius_scale
 		var surface_height = fluid_area.get_height(floater_position)
-		var diff_b: float = floater_position.y - floater.radius - surface_height;
-		var diff_u: float = floater_position.y + floater.radius - surface_height;
+		var diff_b: float = floater_position.y - world_radius - surface_height;
+		var diff_u: float = floater_position.y + world_radius - surface_height;
 		
 		max_diff = max(max_diff, diff_u)
 		min_diff = min(min_diff, diff_b)
@@ -90,9 +95,23 @@ func add_collision_shape(collision: CollisionShape3D) -> void:
 		add_floater(collision.transform * Vector3(0.0, +shape.height * 0.5 - shape.radius, 0.0), shape.radius)
 		volume += PI * pow(shape.radius, 2.0) * shape.height
 	elif shape is CapsuleShape3D:
-		add_floater(collision.transform * Vector3(0.0, -shape.height * 0.5, 0.0), shape.radius)
-		add_floater(collision.transform * Vector3(0.0, +shape.height * 0.5, 0.0), shape.radius)
+		add_floater(collision.transform * Vector3(0.0, -shape.height * 0.5 + shape.radius, 0.0), shape.radius)
+		add_floater(collision.transform * Vector3(0.0, +shape.height * 0.5 - shape.radius, 0.0), shape.radius)
 		volume += (4.0 / 3.0) * PI * pow(shape.radius, 3.0) + PI * pow(shape.radius, 2.0) * shape.height
+	elif shape != null:
+		# Fallback for any other shape (convex, concave, ...): approximate it by its
+		# bounding box so a single imported hull still floats without extra setup.
+		var mesh := shape.get_debug_mesh()
+		if mesh == null:
+			return
+		var aabb := mesh.get_aabb()
+		var c := aabb.get_center()
+		var e := aabb.size * 0.5
+		add_floater(collision.transform * (c + Vector3(-e.x, 0.0, -e.z)))
+		add_floater(collision.transform * (c + Vector3(-e.x, 0.0,  e.z)))
+		add_floater(collision.transform * (c + Vector3( e.x, 0.0, -e.z)))
+		add_floater(collision.transform * (c + Vector3( e.x, 0.0,  e.z)))
+		volume += aabb.size.x * aabb.size.y * aabb.size.z * abs(collision.transform.basis.determinant())
 
 
 func add_floater(position: Vector3, radius: float = 0.0) -> void:

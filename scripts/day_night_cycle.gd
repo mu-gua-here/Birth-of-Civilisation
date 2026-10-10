@@ -27,9 +27,21 @@ class_name DayNightCycle
 @export var night_light_color: Color = Color(0.25, 0.3, 0.45)
 @export var night_light_energy: float = 0.05
 
+@export_group("Moon")
+## Second DirectionalLight3D kept exactly opposite the sun, so whatever the sun leaves in
+## shadow (e.g. the back of the player) still gets light -- and it's what lights the night.
+## Created automatically if left empty.
+@export var moon: DirectionalLight3D
+@export var moon_light_color: Color = Color(0.55, 0.65, 1.0)
+@export var moon_light_energy: float = 0.4
+## Energy of the opposite-side light while the sun is up (0 = moon only shines at night).
+## A small value acts as a fill light from behind/below during the day.
+@export var moon_day_fill_energy: float = 0.2
+@export var moon_shadows := false  # extra shadow pass; keep off for web
+
 @export_group("Ambient")
 @export var noon_ambient_color: Color = Color(0.662745, 0.694118, 0.772549)
-@export var night_ambient_color: Color = Color(0.08, 0.09, 0.14)
+@export var night_ambient_color: Color = Color(0.16, 0.19, 0.30)
 @export var noon_bg_color: Color = Color(0.560784, 0.592157, 0.670588)
 @export var night_bg_color: Color = Color(0.02, 0.02, 0.05)
 
@@ -60,9 +72,14 @@ var suppress_fog := false
 # multi-minute day length, so only push the update when it's moved enough to
 # actually be visible.
 var _last_sky_day_pct: float = -1.0
-const SKY_UPDATE_THRESHOLD := 0.002
+# Change update time interval based on renderer, since web is weaker
+var SKY_UPDATE_THRESHOLD := 0.01 if OS.has_feature("web") else 0.001
 
 func _ready() -> void:
+	if moon == null:
+		moon = DirectionalLight3D.new()
+		moon.name = "Moon"
+		add_child(moon)
 	time_of_day = start_time
 	_apply(time_of_day)
 
@@ -99,6 +116,15 @@ func _apply(t: float) -> void:
 
 		sun.shadow_enabled = day_pct > 0.02 or horizon_pct > 0.3
 
+		# Moon: always the exact opposite direction of the sun (flip 180 deg about its
+		# local Y so -Z, the light direction, reverses). Fades in as the sun sets.
+		if moon and moon.is_inside_tree() and sun.is_inside_tree():
+			moon.global_basis = sun.global_basis * Basis(Vector3.UP, PI)
+			var night_pct := 1.0 - smoothstep(0.0, 0.35, day_pct)
+			moon.light_color = moon_light_color
+			moon.light_energy = lerp(moon_day_fill_energy, moon_light_energy, night_pct)
+			moon.shadow_enabled = moon_shadows and night_pct > 0.5
+			moon.visible = moon.light_energy > 0.001
 	if world_environment and world_environment.environment:
 		var env := world_environment.environment
 		env.ambient_light_color = night_ambient_color.lerp(noon_ambient_color, day_pct)

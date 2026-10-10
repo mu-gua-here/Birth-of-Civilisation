@@ -1,4 +1,5 @@
 extends Node3D
+class_name Builder
 
 ## Responsible for the construction and demolition of objects
 
@@ -34,7 +35,7 @@ var placed_structures: Dictionary = {}
 
 var buildings: Dictionary = {} # id (String) -> BuildingInstance, for placed HOUSE/SHOP/WORKPLACE structures
 
-var construction_sites: Dictionary = {} # id (String) -> ConstructionSite, for structures still being built (A.4)
+var construction_sites: Dictionary = {} # id (String) -> ConstructionSite, for structures still being built
 var construction_visuals: Dictionary = {} # id (String) -> { "ghost": Node3D, "bar": ProgressIndicator3D }
 
 const TREE_COLLISION_LAYER := 2 # deliberately NOT layer 1 -- see nav_region.geometry_collision_mask in _bake_nav()
@@ -47,6 +48,9 @@ const LogScene := preload("res://models/primitive/log.scn")
 const ResourcePropScript := preload("res://scripts/resource_prop.gd")
 
 const GAME_FONT := preload("res://fonts/lilita_one_regular.ttf")
+
+const SFX_PLACE := "sounds/placement-a.ogg, sounds/placement-b.ogg, sounds/placement-c.ogg, sounds/placement-d.ogg"
+const SFX_REMOVE := "sounds/removal-a.ogg, sounds/removal-b.ogg, sounds/removal-c.ogg, sounds/removal-d.ogg"
 
 # Dedicated meshes for a resource type's physics prop, when one exists.
 var _resource_prop_scenes: Dictionary = {
@@ -65,7 +69,7 @@ var gather_progress: Dictionary = {} # id (String) -> 0.0-1.0 persisted chop pro
 
 var plane: Plane # Used for raycasting mouse
 
-var interact_mode: bool = true  # Toggle between building and movement modes
+var interact_mode: bool = false  # Toggle between building and movement modes
 
 # Freeform placement tuning
 const NO_ID := ""
@@ -90,20 +94,17 @@ var _id_counter := 0
 func _ready():
 
 	add_to_group("builder")
+	Globals.register_builder(self)
 
 	map = DataMap.new()
 	plane = Plane(Vector3.UP, Vector3.ZERO)
 
-	# Save starting scene so won't be empty when reload
-	action_save()
-
 	update_structure()
-	_build_resource_display()
+	_build_hint_ui()
 
-	# Initialise selector to match variable
-	interact_mode = !interact_mode
-	selector_container.visible = interact_mode
-	selector.visible = interact_mode
+	# Start in movement mode (no build cursor)
+	selector_container.visible = false
+	selector.visible = false
 
 	# Deferred: spawning citizens and the initial nav bake trigger are both one-time
 	# setup costs that used to land in this same _ready() frame alongside every OTHER
@@ -125,15 +126,8 @@ func _generate_id() -> String:
 	_id_counter += 1
 	return "s_%d_%d" % [Time.get_ticks_usec(), _id_counter]
 
-# Handle different types of collision meshes in Godot
-# Returns a FLAT array of alternating [shape, transform, shape, transform, ...] pairs
-func get_collision_shape(structure: Structure) -> Array:
-	var model = structure.model
-	if model is PackedScene:
-		return get_collision_shape_from_scene(model)
-	else:
-		return [model, Transform3D()]
-
+# Returns [shape, transform] for a structure scene: its own CollisionShape3D if
+# it has one, otherwise a convex hull built from its meshes.
 func get_collision_shape_from_scene(scene: PackedScene) -> Array:
 	var inst := scene.instantiate()
 	add_child(inst)
@@ -303,57 +297,7 @@ func _process(delta):
 			if build_hint_label != null:
 				build_hint_label.visible = false
 
-func get_mesh_and_transform(packed_scene: PackedScene) -> Dictionary:
-	var inst := packed_scene.instantiate()
-	add_child(inst)
-
-	var result := {}
-	var merged := _merge_all_meshes(inst)
-	if merged.get_surface_count() > 0:
-		result["mesh"] = merged
-		result["transform"] = Transform3D()
-
-	inst.queue_free()
-	return result
-
-func _merge_all_meshes(inst: Node) -> ArrayMesh:
-	var merged := ArrayMesh.new()
-	for child in inst.find_children("*", "MeshInstance3D", true, false):
-		var mi := child as MeshInstance3D
-		if mi.mesh == null:
-			continue
-		var relative_xform = inst.global_transform.affine_inverse() * mi.global_transform
-		var normal_basis = relative_xform.basis.orthonormalized()
-
-		for surf in mi.mesh.get_surface_count():
-			var arrays = mi.mesh.surface_get_arrays(surf)
-			if arrays[Mesh.ARRAY_VERTEX] == null:
-				continue
-
-			var verts: PackedVector3Array = arrays[Mesh.ARRAY_VERTEX]
-			var new_verts := PackedVector3Array()
-			new_verts.resize(verts.size())
-			for i in verts.size():
-				new_verts[i] = relative_xform * verts[i]
-			arrays[Mesh.ARRAY_VERTEX] = new_verts
-
-			if arrays[Mesh.ARRAY_NORMAL] != null:
-				var normals: PackedVector3Array = arrays[Mesh.ARRAY_NORMAL]
-				var new_normals := PackedVector3Array()
-				new_normals.resize(normals.size())
-				for i in normals.size():
-					new_normals[i] = (normal_basis * normals[i]).normalized()
-				arrays[Mesh.ARRAY_NORMAL] = new_normals
-
-			merged.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
-			var new_surf_idx = merged.get_surface_count() - 1
-			var mat = mi.get_active_material(surf)
-			if mat:
-				merged.surface_set_material(new_surf_idx, mat)
-
-	return merged
-
-# --- Freeform structure spawning (replaces GridMap set_cell_item) --------
+# --- Freeform structure spawning ------------------------------------------
 
 # Instantiates structure.model at a free world position/rotation, gives it
 # real collision (or a tree-style blocker+obstacle if gatherable), registers
@@ -484,16 +428,16 @@ func action_build(world_position: Vector3):
 		# just refuse if something's already too close.
 		var blocking_id := get_structure_at_point(place_pos, PLACEMENT_MIN_CLEARANCE)
 		if blocking_id != NO_ID:
-			_flash_build_hint("Too close to something else.", place_pos)
+			_flash_build_hint("Too close to something else.")
 			return
 		if _construction_site_near(place_pos, PLACEMENT_MIN_CLEARANCE) != NO_ID:
-			_flash_build_hint("A site is already under construction there.", place_pos)
+			_flash_build_hint("A site is already under construction there.")
 			return
 
-		_warn_if_insufficient_resources(structures[index], place_pos)
+		_warn_if_insufficient_resources(structures[index])
 		_start_construction(place_pos, selector.rotation.y, index)
 
-		Audio.play("sounds/placement-a.ogg, sounds/placement-b.ogg, sounds/placement-c.ogg, sounds/placement-d.ogg", -20)
+		Audio.play(SFX_PLACE, -20)
 
 func _construction_site_near(pos: Vector3, max_dist: float) -> String:
 	for id in construction_sites.keys():
@@ -502,7 +446,7 @@ func _construction_site_near(pos: Vector3, max_dist: float) -> String:
 	return NO_ID
 
 # Flashes a heads-up if the stockpile can't currently cover the full build cost
-func _warn_if_insufficient_resources(structure: Structure, world_pos: Vector3) -> void:
+func _warn_if_insufficient_resources(structure: Structure) -> void:
 	var missing: Array[String] = []
 	for resource_type in structure.build_cost.keys():
 		var needed: int = structure.build_cost[resource_type]
@@ -510,7 +454,7 @@ func _warn_if_insufficient_resources(structure: Structure, world_pos: Vector3) -
 		if available < needed:
 			missing.append("%s (%d/%d)" % [String(resource_type).capitalize(), available, needed])
 	if not missing.is_empty():
-		_flash_build_hint("Not enough resources yet -- site will wait for: " + ", ".join(missing), world_pos)
+		_flash_build_hint("Not enough resources yet -- site will wait for: " + ", ".join(missing))
 
 # Demolish (remove) a structure
 
@@ -520,13 +464,13 @@ func action_demolish(world_position: Vector3):
 		if site_id != NO_ID:
 			construction_sites.erase(site_id)
 			_clear_construction_visual(site_id)
-			Audio.play("sounds/removal-a.ogg, sounds/removal-b.ogg, sounds/removal-c.ogg, sounds/removal-d.ogg", -20)
+			Audio.play(SFX_REMOVE, -20)
 			return
 
 		var id := get_structure_at_point(world_position, DEMOLISH_REACH)
 		if id != NO_ID:
 			remove_structure_instance(id)
-			Audio.play("sounds/removal-a.ogg, sounds/removal-b.ogg, sounds/removal-c.ogg, sounds/removal-d.ogg", -20)
+			Audio.play(SFX_REMOVE, -20)
 
 # Toggle between building mode and movement mode
 
@@ -551,6 +495,7 @@ func action_rotate():
 func action_structure_toggle():
 	# Direct hotbar select: keys 1-9, 0 map to slots 0-9 of the current page
 	var page_count = ceili(float(structures.size()) / 10.0)
+	var previous_index := index
 	for i in range(10):
 		if Input.is_action_just_pressed("selection_%d" % i):
 			var target = hotbar_page * 10 + i
@@ -567,7 +512,9 @@ func action_structure_toggle():
 		hotbar_page = wrap(hotbar_page - 1, 0, page_count)
 		Audio.play("sounds/toggle.ogg", -30)
 
-	update_structure()
+	# Only rebuild the preview when the selection actually changed
+	if index != previous_index:
+		update_structure()
 
 # Update the structure visual in the 'cursor'
 
@@ -584,6 +531,7 @@ func update_structure():
 	# Clear previous structure preview in selector
 	for n in selector_container.get_children():
 		selector_container.remove_child(n)
+		n.queue_free()
 
 	# Create new structure preview in selector
 	var _model = structures[index].model.instantiate()
@@ -592,7 +540,7 @@ func update_structure():
 
 # --- Resource stockpile UI -------------------------------------------------
 
-func _build_resource_display() -> void:
+func _build_hint_ui() -> void:
 	resource_ui_layer = CanvasLayer.new()
 	add_child(resource_ui_layer)
 
@@ -606,23 +554,17 @@ func _build_resource_display() -> void:
 	build_hint_label.visible = false
 	resource_ui_layer.add_child(build_hint_label)
 
-	update_resource_display()
-
 func _apply_game_font(label: Label, size: int) -> void:
 	label.add_theme_font_override("font", GAME_FONT)
 	label.add_theme_font_size_override("font_size", size)
 
-func _flash_build_hint(text: String, world_pos: Vector3 = Vector3.INF) -> void:
+func _flash_build_hint(text: String) -> void:
 	if build_hint_label != null:
 		build_hint_label.text = text
 		build_hint_label.visible = true
 	build_hint_timer = BUILD_HINT_DURATION
 
-func update_resource_display() -> void:
-	pass
-
 # --- Saving/load -----------------------------------------------------------
-# Post-GridMap: iterates placed_structures instead of gridmap.get_used_cells().
 # Ids are NOT persisted -- they're regenerated fresh on load/respawn, since
 # nothing outside a single session references a saved id.
 
@@ -680,22 +622,6 @@ func spawn_citizens(count: int):
 
 # --- Building occupancy (housing / jobs) ---------------------------------
 
-# Finds the nearest placed building of a given type to a world position.
-func get_nearest_structure_of_type(pos: Vector3, type: Structure.Type) -> String:
-	var nearest_id := NO_ID
-	var nearest_dist := INF
-
-	for id in buildings.keys():
-		if structures[buildings[id].structure_index].type != type:
-			continue
-		var world_pos = get_structure_position(id)
-		var dist = pos.distance_squared_to(world_pos)
-		if dist < nearest_dist:
-			nearest_dist = dist
-			nearest_id = id
-
-	return nearest_id
-
 # --- Resource gathering ----------------------------------
 
 # Finds the nearest gatherable structure (e.g. a tree) to a world position.
@@ -737,7 +663,6 @@ func deposit_resources(resources: Dictionary) -> void:
 		return
 	for key in resources.keys():
 		map.stockpile[key] = map.stockpile.get(key, 0) + resources[key]
-	update_resource_display()
 
 func spawn_resource_prop(world_pos: Vector3, resource_type: String, amount: int = 1) -> void:
 	if resource_type == "" or amount <= 0:
@@ -779,7 +704,7 @@ func spawn_resource_prop(world_pos: Vector3, resource_type: String, amount: int 
 	prop.global_position = world_pos + Vector3(randf_range(-0.4, 0.4), 0.6, randf_range(-0.4, 0.4))
 	prop.rotation = Vector3(randf_range(0, TAU), randf_range(0, TAU), randf_range(0, TAU))
 
-# --- Construction pipeline (A.4) ------------------------------------------
+# --- Construction pipeline ------------------------------------------
 
 func _start_construction(pos: Vector3, rotation_y: float, structure_index: int) -> void:
 	var site := ConstructionSite.new()
@@ -833,8 +758,9 @@ func _process_construction(delta: float) -> void:
 	for id in completed_ids:
 		_complete_construction(id)
 
-const BUILD_LABOR_REACH := 1.5
-const PLAYER_BUILDER_ID := "player_builder"
+const BUILD_LABOR_REACH := 1.5 # how close a citizen builder must stand to contribute labor
+const PLAYER_WORK_REACH := 15.0 # player gathers/builds from camera distance, so a much longer reach
+const PLAYER_BUILDER_ID := "player_builder" # id the player registers under in ConstructionSite.assigned_builders (can't collide with 6-digit citizen ids)
 
 func _count_builders_in_range(site: ConstructionSite) -> int:
 	var count := 0
@@ -849,12 +775,12 @@ func _count_builders_in_range(site: ConstructionSite) -> int:
 					break
 		if node == null or not is_instance_valid(node):
 			continue
-		if node.global_position.distance_to(site.position) <= BUILD_LABOR_REACH:
+		var reach := PLAYER_WORK_REACH if builder_id == PLAYER_BUILDER_ID else BUILD_LABOR_REACH
+		if node.global_position.distance_to(site.position) <= reach:
 			count += 1
 	return count
 
 func _commit_resources(site: ConstructionSite, structure: Structure) -> void:
-	var drew_any := false
 	for resource_type in structure.build_cost.keys():
 		var needed: int = structure.build_cost[resource_type]
 		var already: int = site.resources_committed.get(resource_type, 0)
@@ -868,10 +794,6 @@ func _commit_resources(site: ConstructionSite, structure: Structure) -> void:
 
 		map.stockpile[resource_type] = available - to_draw
 		site.resources_committed[resource_type] = already + to_draw
-		drew_any = true
-
-	if drew_any:
-		update_resource_display()
 
 func _resources_fully_committed(site: ConstructionSite, structure: Structure) -> bool:
 	for resource_type in structure.build_cost.keys():
@@ -888,7 +810,7 @@ func _complete_construction(id: String) -> void:
 	_clear_construction_visual(id)
 	_spawn_structure_instance(site.structure_index, site.position, site.rotation_y)
 
-	Audio.play("sounds/placement-a.ogg, sounds/placement-b.ogg, sounds/placement-c.ogg, sounds/placement-d.ogg", -20)
+	Audio.play(SFX_PLACE, -20)
 
 # Finds the nearest active construction site to a world position
 func get_nearest_construction_site(pos: Vector3) -> String:
@@ -1003,9 +925,6 @@ func clear_gather_progress(id: String) -> void:
 	gather_visuals.erase(id)
 
 # --- Chop progress (persisted) ---------------------------------------------
-
-func get_chop_progress(id: String) -> float:
-	return gather_progress.get(id, 0.0)
 
 func add_chop_progress(id: String, amount: float) -> Dictionary:
 	if not placed_structures.has(id):

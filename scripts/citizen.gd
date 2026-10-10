@@ -1,5 +1,3 @@
-# NOTE: LOTS OF OUTDATED CODE, WILL RESOLVE IN NEXT COMMIT
-
 extends Carrier
 
 # Movement settings
@@ -35,10 +33,10 @@ const HOUSING_CHECK_INTERVAL := 2.0 # how often to re-derive housing status from
 var _has_housing: bool = false
 
 var is_gathering: bool = false
-const NO_ID := ""
+const NO_ID := Builder.NO_ID
 var gather_target_id: String = NO_ID
 
-# Building (A.4) -- entered only via explicit assignment (manual click for now)
+# Building -- entered only via explicit assignment (manual click for now)
 var is_building: bool = false
 var build_target_id: String = NO_ID
 
@@ -77,7 +75,7 @@ func _request_initial_wander() -> void:
 		await get_tree().physics_frame
 		if not is_instance_valid(self):
 			return
-	set_new_destination(_wander_target(20.0))
+	set_new_destination(_wander_target(100.0))
 
 func _exit_tree():
 	if builder and is_instance_valid(builder) and data:
@@ -92,8 +90,8 @@ func _physics_process(delta):
 	
 	# Periodically re-check whether this citizen is currently housed.
 	# NOTE: job assignment is intentionally NOT auto-retried here -- per the
-	# plan, manual (CitizenSelector) or policy (Milestone B, not yet built)
-	# assignment via PolicyEngine is the only path to a job right now.
+	# plan, manual (CitizenSelector) or policy (PolicyEngine) assignment is the only
+	# path to a job right now.
 	housing_check_timer -= delta
 	if housing_check_timer <= 0.0:
 		housing_check_timer = HOUSING_CHECK_INTERVAL
@@ -147,8 +145,8 @@ func _physics_process(delta):
 			wander_timer = randf_range(0, 2) * (100 - data.happiness)
 			idle_timer -= delta
 			if idle_timer <= 0:
-				set_new_destination(_wander_target(20.0))
-				idle_timer = clamp(data.happiness, 180, 6000)	
+				set_new_destination(_wander_target(100.0))
+				idle_timer = clamp(randf_range(0.0, data.happiness * 0.2), 5.0, 20.0)
 	
 	if not nav_agent.is_navigation_finished() and data.energy > 0.0:
 		# Guards against the same "Invalid navigation index" error for targets that aren't
@@ -225,13 +223,11 @@ func _start_gathering() -> void:
 	_start_gathering_at(id)
 
 func _start_gathering_at(id: String) -> void:
-	# Targeted version -- player assigned this specific tree via click (A.3).
+	# Targeted version -- a specific tree assigned by the player or PolicyEngine.
 	# Also used by _start_gathering() after it resolves the nearest id.
 	gather_target_id = id
 	is_gathering = true
 	set_new_destination(builder.get_structure_position(id))
-
-# _carried_total() and _update_carried_log_visuals() now live on Carrier (carrier.gd).
 
 func _update_gathering(delta: float) -> void:
 	if not is_gathering:
@@ -354,7 +350,13 @@ func _wander_target(nav_range: float) -> Vector3:
 		return raw
 	return NavigationServer3D.map_get_closest_point(map_rid, raw)
 
+var _last_color_t := -1.0
+
 func update_happiness_color():
-	# Green when happy, red when unhappy
-	var t = data.happiness / 100.0
+	# Green when happy, red when unhappy. Only touch the material when the
+	# (rounded) value actually changed -- this is called every frame per citizen.
+	var t := snappedf(data.happiness / 100.0, 0.01)
+	if t == _last_color_t:
+		return
+	_last_color_t = t
 	happiness_material.albedo_color = Color(1.0 - t, t, 0.0)

@@ -33,7 +33,7 @@ func _ready() -> void:
 		if view_node and view_node.has_node("Camera"):
 			view_camera = view_node.get_node("Camera")
 	
-	builder = get_tree().get_first_node_in_group("builder")
+	builder = Globals.builder
 
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT:

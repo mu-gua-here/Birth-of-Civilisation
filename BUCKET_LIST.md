@@ -7,21 +7,22 @@ Used to keep track of what needs to be done
 ## IMPLEMENTATIONS
 	
 	### HIGH PRIORITY
-	1. Citizen navigation system for new terrain
-	2. Policy system NEEDS to be done for a demo
-	3. Citizen.gd, builder.gd and more still have outdated code from prev attempt
+	1. Add trees/grass/bushes as food source/materials/decor (as navobstacles to terrain)
 	
 	### MID PRIORITY
-	1. Add trees/other decors as navobstacles to terrain
+	1. HUD when player takes damage, is about to run out of energy, etc
 	
 	### LOW PRIORITY
-	1. 
+	1. Citizen behaviour
+	2. Policy system to set rules for citizens
+
 	
 ## BUGS
 	
 	### HIGH PRIORITY
-	1. Ocean terrain mesh waves currently only use BoxShape approx, need accurate coll
-	2. Ocean chunks sometimes disappear near screen edges
+	1. Ocean terrain mesh waves broken, don't follow shape of waves
+	2. Chunk system not loading chunks during runtime
+	3. On web, trackpad rotations are inverted, and player can only change rotation on one axis at a time
 	
 	### MID PRIORITY
 	1. 
@@ -32,10 +33,10 @@ Used to keep track of what needs to be done
 ## IMPROVEMENTS
 
 	### HIGH PRIORITY
-	1. Performance concerns - may not be able to run on web
+	1. Allow player and NPCs to be able to be pushed
 	
 	### MID PRIORITY
-	1. Chunk frustum cull system - sometimes loads chunks little too late
+	1. Add UI
 	
 	### LOW PRIORITY
 	1. 

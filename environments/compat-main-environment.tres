@@ -3,17 +3,19 @@
 [sub_resource type="ProceduralSkyMaterial" id="ProceduralSkyMaterial_native"]
 sky_top_color = Color(0.3, 0.45, 0.75, 1)
 sky_horizon_color = Color(0.68, 0.72, 0.78, 1)
-ground_bottom_color = Color(0.2, 0.2, 0.22, 1)
-ground_horizon_color = Color(0.68, 0.72, 0.78, 1)
+ground_bottom_color = Color(0.16114455, 0.2357836, 0.7681721, 1)
+ground_horizon_color = Color(0.78039217, 0.8039216, 0.8666667, 1)
 ground_curve = 0.17
 
-[sub_resource type="Sky" id="Sky_native"]
+[sub_resource type="Sky" id="Sky_8xld4"]
 sky_material = SubResource("ProceduralSkyMaterial_native")
 
 [resource]
 background_mode = 2
-sky = SubResource("Sky_native")
-ambient_light_source = 3
+sky = SubResource("Sky_8xld4")
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_sky_contribution = 0.0
 reflected_light_source = 2
 tonemap_agx_white = 2.0
 tonemap_agx_contrast = 1.0
@@ -28,9 +30,10 @@ glow_levels/3 = 0.6
 glow_intensity = 2.0
 fog_enabled = true
 fog_light_color = Color(1, 1, 1, 1)
-fog_light_energy = 0.2
-fog_sun_scatter = 0.5
-fog_density = 1.0
+fog_light_energy = 0.5
+fog_density = 0.05
+fog_aerial_perspective = 1.0
 fog_sky_affect = 0.5
 fog_height = 10.0
 fog_height_density = -0.1
+fog_depth_begin = 0.0

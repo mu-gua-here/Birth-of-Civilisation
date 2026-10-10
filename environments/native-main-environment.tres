@@ -12,9 +12,10 @@ sky_material = SubResource("ProceduralSkyMaterial_native")
 
 [resource]
 background_mode = 2
-background_color = Color(0, 0.4961353, 0.74288714, 1)
 sky = SubResource("Sky_native")
-ambient_light_source = 3
+ambient_light_source = 2
+ambient_light_color = Color(1, 1, 1, 1)
+ambient_light_sky_contribution = 0.0
 reflected_light_source = 2
 tonemap_agx_white = 2.0
 tonemap_agx_contrast = 1.0
@@ -29,8 +30,12 @@ glow_levels/3 = 0.6
 glow_intensity = 2.0
 fog_enabled = true
 fog_light_color = Color(1, 1, 1, 1)
+fog_light_energy = 0.5
+fog_density = 0.05
+fog_sky_affect = 0.5
 fog_height = 10.0
 fog_height_density = -0.1
 fog_depth_curve = 0.17677641
 fog_depth_begin = 0.0
 fog_depth_end = 4000.0
+adjustment_brightness = 0.0

@@ -58,8 +58,7 @@ static func build_chunk_mesh(
 	jitter_strength: float,
 	jitter_slope_threshold: float,
 	paint_data: PackedByteArray = PackedByteArray(),
-	paint_steps: int = 8,
-	decimate_flat: bool = true
+	paint_steps: int = 8
 ) -> ArrayMesh:
 	if height_data.is_empty():
 		return null
@@ -147,12 +146,10 @@ static func build_chunk_mesh(
 						)
 
 			# Radical geometry optimization for planar interior surfaces
-			# decimate_flat = false keeps every grid vertex. Required for vertex-displaced
-			# surfaces (water): the shader only samples waves at surviving vertices.
-			if is_flat_center and decimate_flat:
+			if is_flat_center:
 				continue
 
-			if is_flat_edge_point and decimate_flat:
+			if is_flat_edge_point:
 				if (x == 0 or x == chunk_size):
 					if z % 4 != 0: continue
 				else:

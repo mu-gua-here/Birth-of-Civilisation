@@ -324,8 +324,7 @@ func update_chunk(coord: Vector2i) -> void:
 		_manager.jitter_strength,
 		_manager.jitter_slope_threshold,
 		_manager.extract_chunk_paint(coord),
-		LowPolyTerrainManager.PAINT_STEPS,
-		_manager.decimate_flat_areas
+		LowPolyTerrainManager.PAINT_STEPS
 	)
 	# New geometry invalidates any collider built from the previous mesh.
 	rec.collision_dirty = true

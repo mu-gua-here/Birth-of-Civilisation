@@ -1,6 +1,6 @@
 shader_type spatial;
-// Keep depth_draw_always, but use screen_texture for bug-free transparency
-render_mode blend_mix, depth_draw_always, diffuse_lambert, specular_schlick_ggx, cull_disabled;
+// CHANGE 1: Keep depth_draw_always, but use screen_texture for bug-free transparency
+render_mode blend_mix, depth_draw_always, diffuse_lambert, specular_schlick_ggx;
 
 // SET extra_cull_margin ON THE MESH USING THIS SHADER.
 //
@@ -14,9 +14,9 @@ group_uniforms Water_Colors;
 uniform vec3 deep_water_color : source_color = vec3(0.0, 0.4, 0.76);
 uniform vec3 shallow_water_color : source_color = vec3(0.0, 0.6, 0.7);
 uniform vec3 foam_color : source_color = vec3(0.9, 0.95, 1.0);
-uniform float roughness : hint_range(0.0, 1.0) = 0.5;
+uniform float roughness : hint_range(0.0, 1.0) = 0.0;
 
-// Controls base transparency (0.0 = completely invisible, 1.0 = solid)
+// NEW: Controls base transparency (0.0 = completely invisible, 1.0 = solid)
 uniform float water_alpha : hint_range(0.0, 1.0) = 0.6;
 
 group_uniforms Wave_Settings;
@@ -25,19 +25,17 @@ uniform float wave_speed : hint_range(0.1, 60.0) = 1.0;
 uniform float wave_scale : hint_range(0.05, 2.0) = 0.2;
 uniform float wave_height : hint_range(0.0, 5.0) = 0.1;
 uniform float low_poly_stepping : hint_range(1.0, 12.0) = 12.0;
-// Wave clock override. FluidArea3D writes its own time here so the GDScript height query and
-// this shader animate in lockstep; negative means "not driven", fall back to TIME.
-uniform float sync_time = -1.0;
 
 group_uniforms Depth_Settings;
+// CHANGED HERE: Decreased minimum distance to allow extremely narrow foam lines
 uniform float foam_distance : hint_range(0.001, 1.0, 0.001) = 0.05;
-// Controls block size/resolution of the foam edge
+// NEW: Controls block size/resolution of the foam edge
 uniform float foam_stepping : hint_range(2.0, 100.0) = 100.0;
 uniform float depth_distance : hint_range(0.1, 10.0) = 4.0;
 
 // Textures for depth calculation (foam) and the background (transparency)
 uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
-// Fetches the rendered screen image behind the water for the glass effect
+// NEW: Fetches the rendered screen image behind the water for the glass effect
 uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
 
 const float TAU_CONST = 6.28318530718;
@@ -95,7 +93,7 @@ float low_poly_wave(vec2 uv, float time) {
 
 void vertex() {
 	vec3 world_pos = (MODEL_MATRIX * vec4(VERTEX, 1.0)).xyz;
-	float height = low_poly_wave(world_pos.xz, sync_time >= 0.0 ? sync_time : TIME);
+	float height = low_poly_wave(world_pos.xz, TIME);
 	VERTEX.y += height;
 }
 
@@ -124,14 +122,14 @@ void fragment() {
 	float depth_blend = clamp(water_depth / depth_distance, 0.0, 1.0);
 	vec3 water_base = mix(shallow_water_color, deep_water_color, depth_blend);
 	
-	// Read background color for true transparency
+	// 4. NEW: Read background color for true transparency
 	vec3 background_color = textureLod(screen_texture, SCREEN_UV, 0.0).rgb;
 	
-	// Calculate dynamic alpha based on depth
+	// NEW: Calculate dynamic alpha based on depth
 	// Shallow water becomes more transparent, deep water becomes more opaque (light absorption)
 	float dynamic_alpha = mix(water_alpha * 0.3, water_alpha, depth_blend);
 	
-	// Mix the base water color with the background image
+	// NEW: Mix the base water color with the background image
 	vec3 transparent_water = mix(background_color, water_base, dynamic_alpha);
 	
 	// 5. Stylized foam at object intersections (NOW CUSTOMIZABLE)

@@ -175,6 +175,6 @@ func _query_camera_in_fluid(camera: Camera3D) -> bool:
 			# water -- see FluidArea3D's own class comment), so being inside IT isn't the
 			# same as being underwater. Compare against the actual sculpted/waved surface
 			# height instead, or the overlay shows far above where the water really is.
-			if camera.global_position.y <= collider.get_height(camera.global_position):
+			if camera.global_position.y <= collider.get_surface_height(camera.global_position):
 				return true
 	return false

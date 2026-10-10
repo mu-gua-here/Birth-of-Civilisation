@@ -33,6 +33,7 @@ var bounce_active := false
 			_on_death()
 
 @export var heal_rate := 0.1
+@export var heal_energy := 0.5
 
 @export_range(0.0, 100.0) var energy: float = 100.0:
 	set(value):
@@ -40,6 +41,7 @@ var bounce_active := false
 @export var invuln_time: float = 0.5  # seconds of immunity after being hit
 var invuln_timer: float = 0.0
 @export var metabolism: float = 0.001
+@export var move_energy := 0.01
 
 @export_category("Mechanics")
 @export var fall_dmg_threshold := 10.0
@@ -94,7 +96,7 @@ func _physics_process(delta: float) -> void:
 		if in_fluid:
 			velocity.y += direction.y * speed
 	
-	energy -= (metabolism + Vector3(velocity.x, velocity.y if in_fluid else 0.0, velocity.z).length() * metabolism) * delta
+	energy -= Vector3(velocity.x, velocity.y if in_fluid else 0.0, velocity.z).length() * move_energy * delta
 	
 	# Small bounce animation while walking (skipped on the frame a jump already set velocity.y)
 	if is_on_floor() and input_dir != Vector2.ZERO and not just_jumped:
@@ -127,13 +129,15 @@ func _physics_process(delta: float) -> void:
 	var fall_speed := -velocity.y
 	move_and_slide()
 	if is_on_floor() and not in_fluid and fall_speed > fall_dmg_threshold:
-		var damage = fall_speed - fall_dmg_threshold
+		var damage = pow(fall_speed - fall_dmg_threshold, 2)
 		if damage > 2.0:
 			health -= damage
 	
 	_push_colliding_resource_props() # see carrier.gd -- must run AFTER move_and_slide()
 	
+	# Heal player if not at max health
 	health += heal_rate * delta
+	if health < 100.0: energy -= heal_energy * delta
 
 # Called by attackers (e.g. angry citizens). Ignored while invulnerable.
 func take_damage(amount: float, source_position: Vector3 = global_position, knockback_force: float = 4.0) -> void:

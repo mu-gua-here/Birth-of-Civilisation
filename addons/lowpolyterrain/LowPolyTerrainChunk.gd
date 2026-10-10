@@ -11,8 +11,7 @@ class_name LowPolyTerrainChunk
 @export var step_height: float = 0.1
 var jitter_strength: float = 0.0
 var jitter_slope_threshold: float = 0.5
-## False keeps every grid vertex instead of merging flat areas (set by the manager).
-var decimate_flat: bool = true
+
 # NOTE: The height window is NOT stored on the chunk. It is only needed while the mesh is
 # being built, and keeping a copy per chunk duplicated the manager's entire height matrix
 # (measured at 111% of it, since neighbouring chunks each store the shared border row).
@@ -33,9 +32,8 @@ func _ready() -> void:
 
 
 ## Called by the manager to safely pass initialized tracking states, configurations, and raw height arrays.
-func initialize(coord: Vector2i, c_size: int, cell_s: float, step_h: float, manager_data: PackedFloat32Array, m_jitter: float, m_threshold: float, m_material: Material, paint_window: PackedByteArray = PackedByteArray(), paint_steps: int = 8, m_paint_overlay: Material = null, m_decimate_flat: bool = true) -> void:
+func initialize(coord: Vector2i, c_size: int, cell_s: float, step_h: float, manager_data: PackedFloat32Array, m_jitter: float, m_threshold: float, m_material: Material, paint_window: PackedByteArray = PackedByteArray(), paint_steps: int = 8, m_paint_overlay: Material = null) -> void:
 	chunk_coord = coord
-	decimate_flat = m_decimate_flat
 	chunk_size = c_size
 	cell_size = cell_s
 	step_height = step_h
@@ -89,7 +87,7 @@ func generate_mesh(
 	mesh = LowPolyTerrainMeshBuilder.build_chunk_mesh(
 		chunk_coord, chunk_size, cell_size, heights,
 		jitter_strength, jitter_slope_threshold,
-		paint_window, paint_steps, decimate_flat
+		paint_window, paint_steps
 	)
 	
 	# Attach your specific rendering logic, material properties, or visual effects

@@ -19,9 +19,11 @@
 [ext_resource type="Texture2D" uid="uid://cq3ph17sfdegf" path="res://sprites/log-icon.png" id="25_fv21b"]
 [ext_resource type="Script" uid="uid://c6187ysfly3rv" path="res://scripts/day_night_cycle.gd" id="29_fv21b"]
 [ext_resource type="Script" uid="uid://b3g1i41ti7blf" path="res://scripts/fluid_area_3d.gd" id="31_ocean"]
+[ext_resource type="Script" uid="uid://3c7g3h8dxxjn" path="res://scripts/water_surface.gd" id="32_water_surface"]
+[ext_resource type="Script" uid="uid://b5jogbfe3oroy" path="res://scripts/water_debug.gd" id="33_water_debug"]
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ocean"]
-size = Vector3(500, 100, 500)
+size = Vector3(500, 90, 500)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
 top_radius = 0.08
@@ -101,7 +103,7 @@ environment = ExtResource("3_gqmmt")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
-time_of_day = 1.0
+time_of_day = 0.668
 start_time = 0.3
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
@@ -123,23 +125,19 @@ target = NodePath("../Player")
 builder = NodePath("../Builder")
 metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
 
-[node name="OceanChunkLoader" type="Node" parent="." unique_id=1149238444 node_paths=PackedStringArray("target", "builder")]
-script = ExtResource("14_jscy8")
-terrain_group = "terrain_ocean"
-terrain_node_name = "Ocean"
-target = NodePath("../Player")
-builder = NodePath("../Builder")
-load_radius = 160.0
-unload_radius = 200.0
-metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
-
 [node name="Boat" parent="." unique_id=322618501 instance=ExtResource("7_gqmmt")]
 transform = Transform3D(1, 0, 0, 0, 0.9721717, 0.23426932, 0, -0.23426932, 0.9721717, 0, 3.5317965, -74.851494)
 
-[node name="OceanFluid" type="Area3D" parent="." unique_id=2141772413]
+[node name="WaterSurface" type="Node3D" parent="." unique_id=801661843]
+script = ExtResource("32_water_surface")
+
+[node name="WaterDebug" type="Node3D" parent="." unique_id=2024905295]
+script = ExtResource("33_water_debug")
+
+[node name="OceanFluid" type="Area3D" parent="." unique_id=2141772413 node_paths=PackedStringArray("water_surface")]
 collision_layer = 4
 script = ExtResource("31_ocean")
-wave_height = 1.0
+water_surface = NodePath("../WaterSurface")
 
 [node name="CollisionShape3D" type="CollisionShape3D" parent="OceanFluid" unique_id=239001658]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, -40, 0)

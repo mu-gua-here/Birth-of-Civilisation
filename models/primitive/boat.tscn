@@ -1,6 +1,6 @@
 [gd_scene format=4 uid="uid://d1sw4502ux10j"]
 
-[ext_resource type="Script" uid="uid://dc818y4dgir2s" path="res://addons/floatable_body/floatable_body_3d.gd" id="1_1mjqo"]
+[ext_resource type="Script" uid="uid://dq3w8nk5xb2ra" path="res://scripts/boat.gd" id="1_1mjqo"]
 
 [sub_resource type="StandardMaterial3D" id="StandardMaterial3D_pugxq"]
 resource_name = "Material.001"
@@ -151,9 +151,6 @@ points = PackedVector3Array(0.21513173, 0.7016393, 5.260288, -0.5461738, 0.59288
 collision_mask = 3
 mass = 0.4
 script = ExtResource("1_1mjqo")
-floater_volume = 1.0
-floater_radius = 0.15
-metadata/_custom_type_script = "uid://dc818y4dgir2s"
 
 [node name="FloaterBowPort" type="Marker3D" parent="."]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, 1.1)

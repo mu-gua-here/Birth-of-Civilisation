@@ -130,8 +130,8 @@ func _input(event):
 			match event.button_index:
 				MOUSE_BUTTON_WHEEL_UP: camera_rotation.x += step
 				MOUSE_BUTTON_WHEEL_DOWN: camera_rotation.x -= step
-				MOUSE_BUTTON_WHEEL_LEFT: camera_rotation.y += step
-				MOUSE_BUTTON_WHEEL_RIGHT: camera_rotation.y -= step
+				MOUSE_BUTTON_WHEEL_LEFT: camera_rotation.y -= step
+				MOUSE_BUTTON_WHEEL_RIGHT: camera_rotation.y += step
 		get_viewport().set_input_as_handled()
 
 	elif event is InputEventMagnifyGesture:

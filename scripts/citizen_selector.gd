@@ -15,6 +15,9 @@ var panel: PanelContainer
 var name_label: Label
 var id_label: Label
 var stats_label: RichTextLabel
+var bars_box: VBoxContainer
+var hostile_label: Label
+var _bar_rows: Dictionary = {} # stat name -> {row, bar, fill, value}
 var assign_hint_label: Label
 var ui_layer: CanvasLayer
 var ring: MeshInstance3D
@@ -224,40 +227,95 @@ func _refresh_panel() -> void:
 	id_label.text = "Citizen ID: " + d.id if d.id != "" else "No ID"
 	
 	var job_text = d.job if d.job != "" else "Unemployed"
-	var happiness_pct = int(clamp(d.happiness, 0.0, 100.0))
-	var health_pct = int(clamp(d.health, 0.0, 100.0))
-	var energy_pct = int(clamp(d.energy, 0.0, 100.0))
-	
+
 	stats_label.clear()
 	stats_label.append_text("[b]Age:[/b] %d\n" % d.age)
-	stats_label.append_text("[b]Job:[/b] %s\n" % job_text)
-	stats_label.append_text("\n")
-	stats_label.append_text("[b]Happiness:[/b] %s\n" % _bar_text(happiness_pct))
-	stats_label.append_text("[b]Health:[/b] %s\n" % _bar_text(health_pct))
-	stats_label.append_text("[b]Energy:[/b] %s\n" % _bar_text(energy_pct))
-	
-	if selected_citizen.has_method("get") and "is_chasing_player" in selected_citizen:
-		if selected_citizen.is_chasing_player:
-			stats_label.append_text("\n[color=#ff5555][b]Hostile -- chasing player![/b][/color]")
+	stats_label.append_text("[b]Job:[/b] %s" % job_text)
+
+	_begin_bars()
+	_set_bar("Happiness", d.happiness, 100.0)
+	_set_bar("Health", d.health, 100.0)
+	_set_bar("Energy", d.energy, 100.0)
+	_end_bars()
+
+	hostile_label.visible = selected_citizen.has_method("get") and "is_chasing_player" in selected_citizen and selected_citizen.is_chasing_player
+	hostile_label.text = "Hostile -- chasing player!"
 
 # The player isn't a citizen (no CitizenData, no job/age/happiness) -- just
 # show the two stats that matter to them directly: health and energy.
 func _refresh_player_panel() -> void:
 	name_label.text = "You"
 	id_label.text = ""
-	
-	var health_pct = int(clamp(selected_citizen.health, 0.0, selected_citizen.max_health))
-	var energy_pct = int(clamp(selected_citizen.energy, 0.0, 100.0))
-	
-	stats_label.clear()
-	stats_label.append_text("[b]Health:[/b] %s\n" % _bar_text(health_pct))
-	stats_label.append_text("[b]Energy:[/b] %s\n" % _bar_text(energy_pct))
 
-func _bar_text(pct: int) -> String:
-	var filled = int(pct / 10.0)
-	var bar = "█".repeat(filled) + "░".repeat(10 - filled)
-	var color = "#5fd35f" if pct > 60 else ("#e0c84a" if pct > 30 else "#e05f5f")
-	return "[color=%s]%s[/color] %d%%" % [color, bar, pct]
+	stats_label.clear()
+
+	_begin_bars()
+	_set_bar("Health", selected_citizen.health, selected_citizen.max_health)
+	_set_bar("Energy", selected_citizen.energy, 100.0)
+	_end_bars()
+	hostile_label.visible = false
+
+# Stat bars are real ProgressBar controls, not text. The old version drew them out of the
+# block characters U+2588/U+2591, which the game font has no glyphs for; desktop quietly
+# falls back to a system font, but a web export has no system fonts to fall back on, so the
+# bars rendered as empty boxes.
+var _bars_used: Array[String] = []
+
+func _begin_bars() -> void:
+	_bars_used.clear()
+
+func _end_bars() -> void:
+	for stat in _bar_rows:
+		_bar_rows[stat].row.visible = _bars_used.has(stat)
+
+func _set_bar(stat: String, value: float, max_value: float) -> void:
+	_bars_used.append(stat)
+	var entry := _get_bar_row(stat)
+	var bar: ProgressBar = entry.bar
+	bar.max_value = maxf(max_value, 1.0)
+	bar.value = clampf(value, 0.0, bar.max_value)
+	var pct := int(round(bar.value / bar.max_value * 100.0))
+	entry.value.text = "%d%%" % pct
+	entry.fill.bg_color = Color(0.37, 0.83, 0.37) if pct > 60 else (Color(0.88, 0.78, 0.29) if pct > 30 else Color(0.88, 0.37, 0.37))
+
+func _get_bar_row(stat: String) -> Dictionary:
+	if _bar_rows.has(stat):
+		return _bar_rows[stat]
+
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+
+	var name_label_row := Label.new()
+	name_label_row.text = stat + ":"
+	name_label_row.add_theme_font_override("font", GAME_FONT)
+	name_label_row.add_theme_font_size_override("font_size", 22)
+	name_label_row.custom_minimum_size.x = 150
+	row.add_child(name_label_row)
+
+	var bar := ProgressBar.new()
+	bar.show_percentage = false
+	bar.custom_minimum_size = Vector2(240, 22)
+	bar.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	bar.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	var bg := StyleBoxFlat.new()
+	bg.bg_color = Color(1, 1, 1, 0.12)
+	bg.set_corner_radius_all(4)
+	var fill := StyleBoxFlat.new()
+	fill.set_corner_radius_all(4)
+	bar.add_theme_stylebox_override("background", bg)
+	bar.add_theme_stylebox_override("fill", fill)
+	row.add_child(bar)
+
+	var value_label := Label.new()
+	value_label.add_theme_font_override("font", GAME_FONT)
+	value_label.add_theme_font_size_override("font_size", 22)
+	value_label.custom_minimum_size.x = 70
+	row.add_child(value_label)
+
+	bars_box.add_child(row)
+	var entry := {"row": row, "bar": bar, "fill": fill, "value": value_label}
+	_bar_rows[stat] = entry
+	return entry
 
 func _build_ui() -> void:
 	ui_layer = CanvasLayer.new()
@@ -308,8 +366,19 @@ func _build_ui() -> void:
 	stats_label.add_theme_font_override("bold_font", GAME_FONT)
 	stats_label.add_theme_font_size_override("normal_font_size", 22)
 	stats_label.add_theme_font_size_override("bold_font_size", 22)
-	stats_label.custom_minimum_size = Vector2(520, 280)
+	stats_label.custom_minimum_size = Vector2(520, 0)
 	vbox.add_child(stats_label)
+
+	bars_box = VBoxContainer.new()
+	bars_box.add_theme_constant_override("separation", 10)
+	vbox.add_child(bars_box)
+
+	hostile_label = Label.new()
+	hostile_label.add_theme_font_override("font", GAME_FONT)
+	hostile_label.add_theme_font_size_override("font_size", 22)
+	hostile_label.add_theme_color_override("font_color", Color(1.0, 0.33, 0.33))
+	hostile_label.visible = false
+	vbox.add_child(hostile_label)
 	
 	assign_hint_label = Label.new()
 	assign_hint_label.add_theme_font_override("font", GAME_FONT)

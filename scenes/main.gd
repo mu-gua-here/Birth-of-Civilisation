@@ -4,10 +4,7 @@ extends Node3D
 
 # Underwater tint -- blended on top of whatever the surface environment
 # CURRENTLY looks like (captured continuously while surfaced, see
-# _baseline_* below), rather than swapped in as a fixed separate resource.
-# A fixed resource can't track DayNightCycle, which is exactly what caused
-# underwater to read brighter than the surface at night -- this way "murky
-# water" is always relative to whatever the surface is doing right now.
+# _baseline_* below)
 @export var underwater_fog_color: Color = Color(0.0716115, 0.4142087, 0.43344468, 1)
 @export var underwater_fog_density: float = 0.35
 @export_range(0.0, 1.0) var underwater_fog_blend: float = 0.85  # how strongly the tint overrides the surface's current fog color
@@ -173,8 +170,7 @@ func _query_camera_in_fluid(camera: Camera3D) -> bool:
 		if collider is FluidArea3D:
 			# The Area3D shape is only a coarse trigger volume (much taller than the real
 			# water -- see FluidArea3D's own class comment), so being inside IT isn't the
-			# same as being underwater. Compare against the actual sculpted/waved surface
-			# height instead, or the overlay shows far above where the water really is.
+			# same as being underwater
 			if camera.global_position.y <= collider.get_surface_height(camera.global_position):
 				return true
 	return false

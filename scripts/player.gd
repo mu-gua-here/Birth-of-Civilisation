@@ -33,7 +33,7 @@ var bounce_active := false
 			_on_death()
 
 @export var heal_rate := 0.1
-@export var heal_energy := 0.5
+@export var heal_energy := 0.1
 
 @export_range(0.0, 100.0) var energy: float = 100.0:
 	set(value):
@@ -41,7 +41,7 @@ var bounce_active := false
 @export var invuln_time: float = 0.5  # seconds of immunity after being hit
 var invuln_timer: float = 0.0
 @export var metabolism: float = 0.001
-@export var move_energy := 0.01
+@export var move_energy := 0.1
 
 @export_category("Mechanics")
 @export var fall_dmg_threshold := 10.0
@@ -72,16 +72,19 @@ func _physics_process(delta: float) -> void:
 	if not is_on_floor():
 		velocity += get_gravity() * delta
 	
+	# ENERGY MECHANICS
+	
 	# Tiredness slows movement and weakens jumps
 	var energy_mult := clampf(energy * 0.02, 0.25, 1.0)
 	
 	# Jump (solid ground only -- swimming is handled by the swim_up/swim_down axis below)
 	var just_jumped := false
-	if Input.is_action_just_pressed("player_jump") and energy > 0.0 and not in_fluid and (is_on_floor() or bounce_active):
-		velocity.y = JUMP_HEIGHT * energy_mult
-		energy -= JUMP_HEIGHT * 0.01
-		bounce_active = false
-		just_jumped = true
+	if energy > 0.0:
+		if Input.is_action_just_pressed("player_jump") and not in_fluid and (is_on_floor() or bounce_active):
+			velocity.y = JUMP_HEIGHT * energy_mult
+			energy -= JUMP_HEIGHT * 0.01
+			bounce_active = false
+			just_jumped = true
 	
 	# Movement input, rotated to follow the camera
 	var input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
@@ -95,21 +98,27 @@ func _physics_process(delta: float) -> void:
 		velocity.z += direction.z * speed
 		if in_fluid:
 			velocity.y += direction.y * speed
-	
-	energy -= Vector3(velocity.x, velocity.y if in_fluid else 0.0, velocity.z).length() * move_energy * delta
+		# Subtract energy when movement is done by player
+		energy -= move_energy * delta
 	
 	# Small bounce animation while walking (skipped on the frame a jump already set velocity.y)
-	if is_on_floor() and input_dir != Vector2.ZERO and not just_jumped:
-		if not in_fluid or up_down >= 0.0:
-			velocity.y += BOUNCE_HEIGHT - (2.0 * WATER_RESISTANCE if in_fluid else 0.0)
-			bounce_active = true
+	if is_on_floor():
+		if input_dir != Vector2.ZERO and not just_jumped:
+			if not in_fluid or up_down >= 0.0:
+				velocity.y += BOUNCE_HEIGHT - (2.0 * WATER_RESISTANCE if in_fluid else 0.0)
+				bounce_active = true
 	
 	velocity.x *= FRICTION
 	velocity.z *= FRICTION
 	
+	# Slow down player when insufficient energy
 	if energy < 50.0:
 		velocity.x *= energy_mult
 		velocity.z *= energy_mult
+	
+	# Start eating away at health once at critical levels
+	if energy < 20.0:
+		health -= 0.1 * delta
 	
 	# Knockback from attackers, decaying over time
 	if knockback.length() > 0.01:
@@ -129,9 +138,8 @@ func _physics_process(delta: float) -> void:
 	var fall_speed := -velocity.y
 	move_and_slide()
 	if is_on_floor() and not in_fluid and fall_speed > fall_dmg_threshold:
-		var damage = pow(fall_speed - fall_dmg_threshold, 2)
-		if damage > 2.0:
-			health -= damage
+		var damage = 2.5 * (fall_speed - fall_dmg_threshold)
+		health -= damage
 	
 	_push_colliding_resource_props() # see carrier.gd -- must run AFTER move_and_slide()
 	

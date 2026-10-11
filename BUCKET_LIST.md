@@ -16,13 +16,10 @@ Used to keep track of what needs to be done
 	1. Citizen behaviour
 	2. Policy system to set rules for citizens
 
-	
 ## BUGS
 	
 	### HIGH PRIORITY
-	1. Ocean terrain mesh waves broken, don't follow shape of waves
-	2. Chunk system not loading chunks during runtime
-	3. On web, trackpad rotations are inverted, and player can only change rotation on one axis at a time
+	1. 
 	
 	### MID PRIORITY
 	1. 

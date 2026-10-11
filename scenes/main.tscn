@@ -129,7 +129,11 @@ metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
 transform = Transform3D(1, 0, 0, 0, 0.9721717, 0.23426932, 0, -0.23426932, 0.9721717, 0, 3.5317965, -74.851494)
 
 [node name="WaterSurface" type="Node3D" parent="." unique_id=801661843]
+process_priority = 100
 script = ExtResource("32_water_surface")
+directions_deg = PackedFloat32Array(0, 40, -35, 80)
+wavelengths = PackedFloat32Array(32, 21, 14, 9)
+amplitudes = PackedFloat32Array(0.25, 0.15, 0.08, 0.04)
 
 [node name="WaterDebug" type="Node3D" parent="." unique_id=2024905295]
 script = ExtResource("33_water_debug")

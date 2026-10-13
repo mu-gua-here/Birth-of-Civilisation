@@ -2,20 +2,19 @@ extends Node3D
 
 @export var world_environment_node: WorldEnvironment
 
-# Underwater tint -- blended on top of whatever the surface environment
-# CURRENTLY looks like (captured continuously while surfaced, see
-# _baseline_* below)
-@export var underwater_fog_color: Color = Color(0.0716115, 0.4142087, 0.43344468, 1)
-@export var underwater_fog_density: float = 0.35
-@export_range(0.0, 1.0) var underwater_fog_blend: float = 0.85  # how strongly the tint overrides the surface's current fog color
-@export_range(0.0, 1.0) var underwater_ambient_multiplier: float = 0.5  # darkens ambient relative to the surface's current level, not an absolute value
+# Underwater look = a camera-attached overlay (View/Camera/UnderwaterOverlay, shaders/underwater.gdshader).
+# It is NOT environment fog, so the water surface's own shallow/deep colours are left alone.
+# main.gd only toggles it and tells it how bright the day is.
+@export_range(0.0, 1.0) var underwater_ambient_multiplier: float = 0.0  # darkens ambient relative to the surface's current level, not an absolute value
+@export var underwater_day_luminance: float = 0.75  # surface fog luminance that counts as "full daylight" for the overlay
+@export_range(0.0, 1.0) var underwater_min_light: float = 0.08  # overlay never goes darker than this (night)
 
 @onready var day_night_cycle: Node = $DayNightCycle
 @onready var view: Node3D = $View
 
+@onready var _underwater_overlay := get_node_or_null("View/Camera/UnderwaterOverlay") as MeshInstance3D
+
 var _camera_in_fluid := false
-var _baseline_fog_color: Color
-var _baseline_fog_density: float
 var _baseline_ambient_energy: float
 
 func _ready():
@@ -29,8 +28,6 @@ func _ready():
 	process_priority = 10
 	if world_environment_node and world_environment_node.environment:
 		var env := world_environment_node.environment
-		_baseline_fog_color = env.fog_light_color
-		_baseline_fog_density = env.fog_density
 		_baseline_ambient_energy = env.ambient_light_energy
 
 func _process(_delta: float) -> void:
@@ -45,32 +42,33 @@ func _process(_delta: float) -> void:
 	var camera_in_fluid := _query_camera_in_fluid(camera)
 
 	if not camera_in_fluid:
-		# Keep tracking the surface's current look every frame we're NOT
-		# submerged, so the tint always blends from an up-to-date baseline
-		# the next time the camera goes under.
-		_baseline_fog_color = env.fog_light_color
-		_baseline_fog_density = env.fog_density
+		# Track the surface's ambient while surfaced so the underwater darkening
+		# always scales from the current time of day.
 		_baseline_ambient_energy = env.ambient_light_energy
-		if _camera_in_fluid and day_night_cycle:
-			day_night_cycle.suppress_fog = false
+		if _underwater_overlay:
+			_underwater_overlay.visible = false
 		_camera_in_fluid = false
 		return
-
-	if not _camera_in_fluid and day_night_cycle:
-		# DayNightCycle re-fetches world_environment.environment fresh each
-		# frame -- without this it'd fight us over fog_light_color/density
-		# every frame we're both trying to write to the same resource.
-		day_night_cycle.suppress_fog = true
+	
 	_camera_in_fluid = true
-
-	env.fog_enabled = true
-	env.fog_light_color = _baseline_fog_color.lerp(underwater_fog_color, underwater_fog_blend)
-	env.fog_density = max(_baseline_fog_density, underwater_fog_density)
 	env.ambient_light_energy = _baseline_ambient_energy * underwater_ambient_multiplier
+	if _underwater_overlay:
+		_underwater_overlay.visible = true
+		# Env fog is no longer overwritten while submerged, so it still holds the
+		# day/night colour -- use it as the "how bright is it up there" signal.
+		var light := clampf(env.fog_light_color.get_luminance() / underwater_day_luminance, underwater_min_light, 1.0)
+		var mat := _underwater_overlay.material_override as ShaderMaterial
+		if mat:
+			mat.set_shader_parameter("light_level", light)
+			# Surface height right above the camera (includes waves) so only the
+			# below-water part of each view ray gets tinted.
+			var water := get_node_or_null("WaterSurface")
+			var cam_pos: Vector3 = camera.global_position
+			mat.set_shader_parameter("water_level", water.height_at(cam_pos.x, cam_pos.z) if water else cam_pos.y + 1.0)
 
 # --- Debug perf A/B (debug builds only). Stand where fps drops, press one key at a time:
 #   F1 3D render scale 1.0/0.75/0.5   F2 shadow splits 1/2/4   F3 MSAA on/off
-#   F4 hide/show Ocean                F5 print fps once a second
+#   F5 print fps once a second
 var _dbg_scale_i := 0
 var _dbg_fps_log := false
 var _dbg_fps_t := 0.0
@@ -101,11 +99,6 @@ func _unhandled_input(event: InputEvent) -> void:
 		KEY_F3:
 			vp.msaa_3d = Viewport.MSAA_2X if vp.msaa_3d == Viewport.MSAA_DISABLED else Viewport.MSAA_DISABLED
 			print("[perf] MSAA = ", "2x" if vp.msaa_3d == Viewport.MSAA_2X else "off")
-		KEY_F4:
-			var ocean := find_child("Ocean", true, false) as Node3D
-			if ocean:
-				ocean.visible = not ocean.visible
-				print("[perf] Ocean visible = ", ocean.visible)
 		KEY_F5:
 			_dbg_fps_log = not _dbg_fps_log
 

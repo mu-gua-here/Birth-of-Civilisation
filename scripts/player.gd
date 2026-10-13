@@ -21,6 +21,10 @@ var spawn_point: Vector3
 @export var BOUNCE_HEIGHT := 4.0
 var bounce_active := false
 
+@export_category("Fall damage")
+@export var fall_dmg_enabled := true
+@export var fall_dmg_threshold := 10.0
+
 # Player physiological settings. Assign to health/energy directly -- the setters
 # clamp, emit health_changed and handle death.
 @export_category("Physiology")
@@ -42,9 +46,6 @@ var bounce_active := false
 var invuln_timer: float = 0.0
 @export var metabolism: float = 0.001
 @export var move_energy := 0.1
-
-@export_category("Mechanics")
-@export var fall_dmg_threshold := 10.0
 
 # Knockback
 var knockback: Vector3 = Vector3.ZERO
@@ -117,7 +118,7 @@ func _physics_process(delta: float) -> void:
 		velocity.z *= energy_mult
 	
 	# Start eating away at health once at critical levels
-	if energy < 20.0:
+	if energy < 30.0:
 		health -= 0.1 * delta
 	
 	# Knockback from attackers, decaying over time
@@ -137,9 +138,11 @@ func _physics_process(delta: float) -> void:
 	# Fall damage needs the speed before move_and_slide() zeroes it on landing
 	var fall_speed := -velocity.y
 	move_and_slide()
-	if is_on_floor() and not in_fluid and fall_speed > fall_dmg_threshold:
-		var damage = 2.5 * (fall_speed - fall_dmg_threshold)
-		health -= damage
+	if fall_dmg_enabled:
+		if (is_on_floor() or is_in_fluid()) and fall_speed > fall_dmg_threshold:
+			# Twice as less damage when falling on water than on land
+			var damage = 1.5 * (fall_speed - fall_dmg_threshold) * (2 - int(is_in_fluid()))
+			health -= damage
 	
 	_push_colliding_resource_props() # see carrier.gd -- must run AFTER move_and_slide()
 	

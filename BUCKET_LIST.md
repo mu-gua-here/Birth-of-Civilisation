@@ -8,6 +8,7 @@ Used to keep track of what needs to be done
 	
 	### HIGH PRIORITY
 	1. Add trees/grass/bushes as food source/materials/decor (as navobstacles to terrain)
+	2. Replace the capsule bodies with actual humanoids
 	
 	### MID PRIORITY
 	1. HUD when player takes damage, is about to run out of energy, etc

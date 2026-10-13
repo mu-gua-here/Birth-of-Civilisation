@@ -1,4 +1,4 @@
-[gd_scene format=3 uid="uid://vgwrcfy1qawf"]
+[gd_scene format=4 uid="uid://vgwrcfy1qawf"]
 
 [ext_resource type="Script" uid="uid://ce6sixkgkcpti" path="res://scenes/main.gd" id="1_2f3dj"]
 [ext_resource type="Script" uid="uid://76g8ejmdibal" path="res://scripts/builder.gd" id="1_jybm7"]
@@ -9,6 +9,7 @@
 [ext_resource type="PackedScene" uid="uid://filshn1wyhbe" path="res://scenes/terrain.res" id="5_jscy8"]
 [ext_resource type="PackedScene" uid="uid://d1sw4502ux10j" path="res://models/primitive/boat.tscn" id="7_gqmmt"]
 [ext_resource type="Script" uid="uid://dec71yx4xpg2c" path="res://scripts/view.gd" id="8_yovpv"]
+[ext_resource type="Shader" uid="uid://cpxqw732s4kn1" path="res://shaders/water_surface.gdshader" id="9_pm3ni"]
 [ext_resource type="PackedScene" uid="uid://b2n3240eehfe5" path="res://models/ancient/wall.glb" id="12_yc10j"]
 [ext_resource type="Script" uid="uid://dn7i8yp68pgnm" path="res://tools/terrain_chunk_loader.gd" id="14_jscy8"]
 [ext_resource type="FontFile" uid="uid://d0cxd77jybrcn" path="res://fonts/lilita_one_regular.ttf" id="16_vlub6"]
@@ -21,9 +22,29 @@
 [ext_resource type="Script" uid="uid://b3g1i41ti7blf" path="res://scripts/fluid_area_3d.gd" id="31_ocean"]
 [ext_resource type="Script" uid="uid://3c7g3h8dxxjn" path="res://scripts/water_surface.gd" id="32_water_surface"]
 [ext_resource type="Script" uid="uid://b5jogbfe3oroy" path="res://scripts/water_debug.gd" id="33_water_debug"]
+[ext_resource type="Shader" uid="uid://c881bowtbvx8c" path="res://shaders/underwater.gdshader" id="34_underwater"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_020yl"]
+render_priority = 0
+shader = ExtResource("9_pm3ni")
+shader_parameter/deep_water_color = Color(0, 0.24260709, 0.44680703, 1)
+shader_parameter/shallow_water_color = Color(2.7915835e-06, 0.5865663, 0.7731598, 1)
+shader_parameter/foam_color = Color(0.9, 0.95, 1, 1)
+shader_parameter/roughness = 0.250000011875
+shader_parameter/water_alpha = 1.0
+shader_parameter/underwater_alpha = 0.90000004275
+shader_parameter/wave_a = PackedVector4Array(1, 0, 0.19634955, 0.25, 0.76604444, 0.64278764, 0.2991993, 0.15, 0.81915206, -0.57357645, 0.44879895, 0.08, 0.17364818, 0.9848077, 0.6981317, 0.04)
+shader_parameter/wave_phase = Vector4(2.893419, 1.5220729, 3.9895601, 3.9973676)
+shader_parameter/foam_distance = 0.05
+shader_parameter/foam_stepping = 100.0
+shader_parameter/depth_distance = 4.0
+shader_parameter/edge_fog_color = Color(0.65, 0.78, 0.92, 1)
+shader_parameter/fade_start = 74.39999999999999
+shader_parameter/fade_end = 124.0
+shader_parameter/edge_fog_max_strength = 1.0
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ocean"]
-size = Vector3(500, 90, 500)
+size = Vector3(500, 250, 500)
 
 [sub_resource type="CylinderMesh" id="CylinderMesh_trunk"]
 top_radius = 0.08
@@ -76,6 +97,22 @@ happiness_bonus = 1.5
 margin = 0.0
 radius = 0.25
 
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_underwater"]
+render_priority = 100
+shader = ExtResource("34_underwater")
+shader_parameter/shallow_tint = Color(0.1, 0.55, 0.6, 1)
+shader_parameter/deep_tint = Color(0.2028515, 0.31826773, 0.48962057, 1)
+shader_parameter/density = 0.30000001425
+shader_parameter/max_alpha = 1.0
+shader_parameter/color_distance = 0.0
+shader_parameter/max_distance = 200.0
+shader_parameter/light_level = 1.0
+shader_parameter/water_level = 0.0
+shader_parameter/debug_flat = false
+
+[sub_resource type="QuadMesh" id="QuadMesh_underwater"]
+size = Vector2(2, 2)
+
 [sub_resource type="BoxShape3D" id="BoxShape3D_jscy8"]
 size = Vector3(500, 250, 10)
 
@@ -87,24 +124,25 @@ shadow_color = Color(0, 0, 0, 0.392157)
 [node name="Main" type="Node3D" unique_id=516018331 node_paths=PackedStringArray("world_environment_node")]
 script = ExtResource("1_2f3dj")
 world_environment_node = NodePath("WorldEnvironment")
-underwater_fog_color = Color(0.036892798, 0.7805617, 0.8752894, 1)
-underwater_fog_density = 0.1
-underwater_fog_blend = 0.273
+underwater_ambient_multiplier = 0.5
+underwater_min_light = 0.0
 
 [node name="Player" parent="." unique_id=1514412654 node_paths=PackedStringArray("view_node") instance=ExtResource("2_jscy8")]
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.2, 6.0164056, -66.118)
 view_node = NodePath("../View")
 JUMP_HEIGHT = 7.0
-fluid_damp = 15.0
-fluid_buoyancy_scale = 0.15
+fall_dmg_enabled = false
+fluid_damp = 10.0
+fluid_buoyancy_scale = 0.1
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=558144835]
 environment = ExtResource("3_gqmmt")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
-time_of_day = 0.668
-start_time = 0.3
+enabled = false
+time_of_day = 0.5
+start_time = 0.5
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
 horizon_light_energy = 2.0
@@ -134,6 +172,8 @@ script = ExtResource("32_water_surface")
 directions_deg = PackedFloat32Array(0, 40, -35, 80)
 wavelengths = PackedFloat32Array(32, 21, 14, 9)
 amplitudes = PackedFloat32Array(0.25, 0.15, 0.08, 0.04)
+animate_in_editor = true
+material = SubResource("ShaderMaterial_020yl")
 
 [node name="WaterDebug" type="Node3D" parent="." unique_id=2024905295]
 script = ExtResource("33_water_debug")
@@ -187,11 +227,20 @@ margin = 0.5
 transform = Transform3D(-0.71933985, -0.07863768, 0.6901924, 0.3984392, 0.7671792, 0.5026749, -0.5690306, 0.6365948, -0.5205302, -2.5591154, 2.3570368, 27.521986)
 current = true
 
+[node name="UnderwaterOverlay" type="MeshInstance3D" parent="View/Camera" unique_id=116929440]
+material_override = SubResource("ShaderMaterial_underwater")
+cast_shadow = 0
+extra_cull_margin = 16384.0
+ignore_occlusion_culling = true
+mesh = SubResource("QuadMesh_underwater")
+
 [node name="CitizenSelector" type="Node3D" parent="." unique_id=1161909614 node_paths=PackedStringArray("view_camera")]
 script = ExtResource("20_tel4y")
 view_camera = NodePath("../View/Camera")
 
 [node name="Boundary" type="StaticBody3D" parent="." unique_id=156893584]
+collision_layer = 3
+collision_mask = 3
 
 [node name="Front" type="CollisionShape3D" parent="Boundary" unique_id=990554598]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 50, 250)
@@ -218,6 +267,7 @@ debug_color = Color(0.4268808, 0.8921722, 0.9999998, 1)
 [node name="MultiMeshInstance3D" type="MultiMeshInstance3D" parent="Trees" unique_id=145539410]
 
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=327302228]
+visible = false
 follow_viewport_enabled = true
 
 [node name="Top" type="Control" parent="CanvasLayer" unique_id=560779850]

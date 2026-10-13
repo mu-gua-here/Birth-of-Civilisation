@@ -11,11 +11,12 @@ shader_type spatial;
 render_mode blend_mix, depth_draw_always, diffuse_lambert, specular_schlick_ggx, cull_disabled;
 
 group_uniforms Water_Colors;
-uniform vec3 deep_water_color : source_color = vec3(0.0, 0.4, 0.76);
+uniform vec3 deep_water_color : source_color = vec3(0.0, 0.6, 0.9);
 uniform vec3 shallow_water_color : source_color = vec3(0.0, 0.6, 0.7);
 uniform vec3 foam_color : source_color = vec3(0.9, 0.95, 1.0);
 uniform float roughness : hint_range(0.0, 1.0) = 0.5;
 uniform float water_alpha : hint_range(0.0, 1.0) = 1.0;
+uniform float underwater_alpha : hint_range(0.0, 1.0) = 0.8; // surface opacity when viewed from below
 
 // Set by WaterSurface -- do not edit by hand.
 // wave_a[i] = (direction.x, direction.y, wavenumber k, amplitude); wave_phase[i] = radians,
@@ -38,7 +39,6 @@ uniform float fade_end = 150.0;
 uniform float edge_fog_max_strength : hint_range(0.0, 1.0) = 1.0;
 
 uniform sampler2D depth_texture : hint_depth_texture, filter_linear_mipmap;
-uniform sampler2D screen_texture : hint_screen_texture, filter_linear_mipmap;
 
 varying vec3 v_world_pos;
 
@@ -79,21 +79,31 @@ void fragment() {
 
 	float depth_blend = clamp(water_depth / depth_distance, 0.0, 1.0);
 	vec3 water_base = mix(shallow_water_color, deep_water_color, depth_blend);
-	vec3 background_color = textureLod(screen_texture, SCREEN_UV, 0.0).rgb;
 	float dynamic_alpha = mix(water_alpha * 0.3, water_alpha, depth_blend);
-	vec3 transparent_water = mix(background_color, water_base, dynamic_alpha);
+
+	// Seen from below: the derived normal faces the camera (i.e. down), so the sun lit it from
+	// behind and it went black. Flip it so it is lit like the top, and keep it mostly clear so
+	// the sky / world above stays visible.
+	bool underside = !FRONT_FACING;
+	if (underside) {
+		NORMAL = -NORMAL;
+		dynamic_alpha = water_alpha * underwater_alpha;
+	}
 
 	// Stepped foam at intersections (depth-based aesthetic, unrelated to wave motion)
 	float stepped_depth = floor(water_depth * foam_stepping) / foam_stepping;
-	float foam_mask = step(stepped_depth, foam_distance);
-	vec3 result = mix(transparent_water, foam_color, foam_mask);
+	float foam_mask = underside ? 0.0 : step(stepped_depth, foam_distance);
+	vec3 result = mix(water_base, foam_color, foam_mask);
+	float alpha = mix(dynamic_alpha, 1.0, foam_mask);
 
 	// Horizon fade, radial from the camera
 	float dist = length(v_world_pos.xz - CAMERA_POSITION_WORLD.xz);
 	float fade = smoothstep(fade_start, fade_end, dist) * edge_fog_max_strength;
 	result = mix(result, edge_fog_color, fade);
+	alpha = mix(alpha, 1.0, fade);
 
 	ALBEDO = result;
+	ALPHA = alpha;
 	ROUGHNESS = roughness;
 	SPECULAR = 0.5;
 }

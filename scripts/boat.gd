@@ -27,10 +27,10 @@ var _floaters: Array[Vector3] = [] # local to the body
 func _ready() -> void:
 	can_sleep = false # a sleeping body would ignore waves until something bumped it
 	var inv := global_transform.affine_inverse()
-	for child in find_children("Floater*", "Marker3D", true, false):
+	for child in $Floaters.get_children():
 		_floaters.append(inv * child.global_position)
 	if _floaters.is_empty():
-		push_warning("Boat '%s': no Marker3D children named Floater* -- it will not float." % name)
+		push_warning("Boat '%s': no Marker3D children under parent Floater -- object will not float." % name)
 
 
 func _physics_process(_delta: float) -> void:

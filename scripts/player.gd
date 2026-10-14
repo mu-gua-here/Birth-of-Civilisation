@@ -12,17 +12,21 @@ var build_target_id: String = NO_ID
 
 var spawn_point: Vector3
 
+@export_category("Devmode")
+@export var dev_mode := false
+@export var DEV_SPEED: float = 2.5
+
 # Player physical movement
 @export_category("Physics")
-@export var SPEED: float = 0.5
-@export var JUMP_HEIGHT: float = 5.0
-@export var FRICTION: float = 0.8
-@export var WATER_RESISTANCE: float = 0.99
+@export var SPEED := 0.5
+@export var SWIM_SPEED := 0.5
+@export var JUMP_HEIGHT := 5.0
+@export var FRICTION := 0.8
+@export var WATER_RESISTANCE := 0.99
 @export var BOUNCE_HEIGHT := 4.0
 var bounce_active := false
 
-@export_category("Fall damage")
-@export var fall_dmg_enabled := true
+@export_category("Mechanics")
 @export var fall_dmg_threshold := 10.0
 
 # Player physiological settings. Assign to health/energy directly -- the setters
@@ -65,13 +69,13 @@ func _ready():
 	_carrier_ready() # sets `builder` (see carrier.gd)
 
 func _physics_process(delta: float) -> void:
-	_apply_buoyancy(delta) # see carrier.gd -- must run before gravity/movement
+	if not dev_mode:
+		_apply_gravity(delta) # see carrier.gd -- gradual sink in water, normal gravity on land
 	
-	# Cached: is_in_fluid() walks every floater
+	# Cached: is_in_fluid() samples the water height
 	var in_fluid := is_in_fluid()
 	
-	if not is_on_floor():
-		velocity += get_gravity() * delta
+	# (gravity / sinking is applied at the top by _apply_gravity())
 	
 	# ENERGY MECHANICS
 	
@@ -89,16 +93,18 @@ func _physics_process(delta: float) -> void:
 	
 	# Movement input, rotated to follow the camera
 	var input_dir := Input.get_vector("ui_left", "ui_right", "ui_up", "ui_down")
-	var up_down := Input.get_axis("swim_down", "swim_up")
-	var move_vec := Vector3(input_dir.x, up_down if in_fluid else 0.0, input_dir.y)
+	var up_down := Input.get_axis("descend", "ascend")
+	var move_vec := Vector3(input_dir.x, up_down if in_fluid or dev_mode else 0.0, input_dir.y)
 	var direction := move_vec.rotated(Vector3.UP, view_node.rotation.y if view_node else 0.0).normalized()
 	
-	var speed := SPEED * (2.0 if Input.is_action_pressed("run") else 1.0)
+	var speed: float = (DEV_SPEED if dev_mode else SPEED) * (2.0 if Input.is_action_pressed("run") else 1.0)
 	if not direction.is_zero_approx():
 		velocity.x += direction.x * speed
 		velocity.z += direction.z * speed
-		if in_fluid:
+		if dev_mode:
 			velocity.y += direction.y * speed
+		elif in_fluid:
+			velocity.y += direction.y * SWIM_SPEED
 		# Subtract energy when movement is done by player
 		energy -= move_energy * delta
 	
@@ -110,6 +116,7 @@ func _physics_process(delta: float) -> void:
 				bounce_active = true
 	
 	velocity.x *= FRICTION
+	if dev_mode: velocity.y *= FRICTION
 	velocity.z *= FRICTION
 	
 	# Slow down player when insufficient energy
@@ -138,7 +145,7 @@ func _physics_process(delta: float) -> void:
 	# Fall damage needs the speed before move_and_slide() zeroes it on landing
 	var fall_speed := -velocity.y
 	move_and_slide()
-	if fall_dmg_enabled:
+	if not dev_mode:
 		if (is_on_floor() or is_in_fluid()) and fall_speed > fall_dmg_threshold:
 			# Twice as less damage when falling on water than on land
 			var damage = 1.5 * (fall_speed - fall_dmg_threshold) * (2 - int(is_in_fluid()))

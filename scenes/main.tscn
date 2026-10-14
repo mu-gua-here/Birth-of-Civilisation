@@ -16,6 +16,7 @@
 [ext_resource type="PackedScene" uid="uid://cwik60akjhciu" path="res://scenes/citizen.tscn" id="18_og1vs"]
 [ext_resource type="Script" uid="uid://wlstv8x8ubp6" path="res://scripts/citizen_selector.gd" id="20_tel4y"]
 [ext_resource type="Texture2D" uid="uid://ciwbdik3tmxtp" path="res://sprites/instructions.png" id="22_pm3ni"]
+[ext_resource type="Script" uid="uid://mp0ylpuofo3" path="res://scenes/audio.gd" id="24_og1vs"]
 [ext_resource type="AudioStream" uid="uid://wvfsgkl8qob6" path="res://sounds/ambience.ogg" id="24_y6deb"]
 [ext_resource type="Texture2D" uid="uid://cq3ph17sfdegf" path="res://sprites/log-icon.png" id="25_fv21b"]
 [ext_resource type="Script" uid="uid://c6187ysfly3rv" path="res://scripts/day_night_cycle.gd" id="29_fv21b"]
@@ -34,7 +35,7 @@ shader_parameter/roughness = 0.250000011875
 shader_parameter/water_alpha = 1.0
 shader_parameter/underwater_alpha = 0.90000004275
 shader_parameter/wave_a = PackedVector4Array(1, 0, 0.19634955, 0.25, 0.76604444, 0.64278764, 0.2991993, 0.15, 0.81915206, -0.57357645, 0.44879895, 0.08, 0.17364818, 0.9848077, 0.6981317, 0.04)
-shader_parameter/wave_phase = Vector4(2.893419, 1.5220729, 3.9895601, 3.9973676)
+shader_parameter/wave_phase = Vector4(4.5505314, 0.44983047, 0.8962337, 0.96533865)
 shader_parameter/foam_distance = 0.05
 shader_parameter/foam_stepping = 100.0
 shader_parameter/depth_distance = 4.0
@@ -131,22 +132,19 @@ underwater_min_light = 0.0
 transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.2, 6.0164056, -66.118)
 view_node = NodePath("../View")
 JUMP_HEIGHT = 7.0
-fall_dmg_enabled = false
-fluid_damp = 10.0
-fluid_buoyancy_scale = 0.1
+fluid_damp = 15.0
+sink_accel = 10.0
 
 [node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=558144835]
 environment = ExtResource("3_gqmmt")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
-enabled = false
-time_of_day = 0.5
-start_time = 0.5
+time_of_day = 0.405
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
 horizon_light_energy = 2.0
-moon_light_energy = 0.05
+moon_light_energy = 0.1
 moon_shadows = true
 noon_sky_energy = 1.5
 night_sky_energy = 1.0
@@ -165,6 +163,8 @@ metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
 
 [node name="Boat" parent="." unique_id=322618501 instance=ExtResource("7_gqmmt")]
 transform = Transform3D(1, 0, 0, 0, 0.9721717, 0.23426932, 0, -0.23426932, 0.9721717, 0, 3.5317965, -74.851494)
+floater_radius = 2.0
+damping_ratio = 2.0
 
 [node name="WaterSurface" type="Node3D" parent="." unique_id=801661843]
 process_priority = 100
@@ -207,6 +207,7 @@ texture = ExtResource("4_wr1wv")
 transform = Transform3D(-0.422618, -0.694272, 0.582563, 0, 0.642788, 0.766044, -0.906308, 0.323744, -0.271654, 0, 0, 0)
 shadow_enabled = true
 shadow_opacity = 0.75
+directional_shadow_mode = 1
 
 [node name="View" type="Node3D" parent="." unique_id=324000787 node_paths=PackedStringArray("target")]
 transform = Transform3D(0.707107, -0.40558, 0.579228, 0, 0.819152, 0.573576, -0.707107, -0.40558, 0.579228, 0, -1, 0)
@@ -228,6 +229,7 @@ transform = Transform3D(-0.71933985, -0.07863768, 0.6901924, 0.3984392, 0.767179
 current = true
 
 [node name="UnderwaterOverlay" type="MeshInstance3D" parent="View/Camera" unique_id=116929440]
+visible = false
 material_override = SubResource("ShaderMaterial_underwater")
 cast_shadow = 0
 extra_cull_margin = 16384.0
@@ -314,7 +316,10 @@ offset_bottom = 887.0
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("22_pm3ni")
 
-[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=115452384]
+[node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=115452384 node_paths=PackedStringArray("camera")]
 stream = ExtResource("24_y6deb")
 autoplay = true
+bus = &"Underwater"
 parameters/looping = true
+script = ExtResource("24_og1vs")
+camera = NodePath("../View/Camera")

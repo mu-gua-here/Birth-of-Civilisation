@@ -10,23 +10,25 @@ const PUSH_SLOWDOWN := 0.5  # fraction of our own incoming speed we lose while s
 
 var builder: Node = null
 
-## Buoyancy (addons/floatable_body) -- CharacterBody3D isn't a RigidBody3D,
-## so we can't use FloatableBody3D directly. Instead we drive the same
-## FluidInteractor3D helper by hand: register floaters from our collision
-## shape(s), call process() every physics frame, and fold float_force into
-## `velocity` ourselves (see _apply_buoyancy()). mass is fixed at 1.0 since
-## Carrier has no physical mass property of its own.
-const FLUID_MASS := 1.0
+## Sinking (no buoyancy) -- people don't float up on their own, so a carrier in the water is
+## pulled down GRADUALLY rather than dropping like on land: a constant downward pull (sink_accel)
+## fighting drag (fluid_damp), which eases in to a terminal sink speed of sink_accel / fluid_damp
+## m/s. "In the water" = the water probe (centre of our collision shape) is below
+## FluidArea3D.get_height(), i.e. roughly half submerged. See _apply_gravity().
 @export var fluid_damp := 4.0
 
-## Scales the raw Archimedes force from FluidInteractor3D. At 1.0 the
-## carrier is fully buoyant and settles AT the surface (floats). Below 1.0
-## buoyancy no longer fully cancels gravity, so the carrier sinks -- slowly,
-## because fluid_damp still caps how fast velocity can build up, rather
-## than free-falling at normal gravity speed. Tuned for "sink gradually
-## toward the bottom" rather than "bob at the surface".
-@export var fluid_buoyancy_scale := 0.45
-@onready var fluid_interactor := FluidInteractor3D.new()
+## Downward acceleration while in water (m/s^2). Terminal sink speed = sink_accel / fluid_damp
+## (3.0 / 4.0 = 0.75 m/s). Raise for a faster sink, lower for a slower one.
+@export var sink_accel := 3.0
+
+## How far BELOW the visible water surface the body centre must be before it counts as in the
+## water. 0.0 = centre at the surface, i.e. half the body can stay above water. Raise it to make
+## carriers wade deeper before sinking.
+@export var wade_depth := 0.0
+
+## The FluidArea3D we're currently inside (null on land). Set by fluid_area_enter/exit.
+var fluid_area: FluidArea3D = null
+var _water_probe: CollisionShape3D = null
 
 # Call this from _ready() in the subclass (after add_to_group etc.) instead
 # of duplicating the setup.
@@ -42,34 +44,38 @@ func _carrier_ready() -> void:
 	for owner_id in get_shape_owners():
 		var collision = shape_owner_get_owner(owner_id)
 		if collision is CollisionShape3D:
-			fluid_interactor.add_collision_shape(collision)
+			_water_probe = collision
+			break
 
-# Call once per physics frame, BEFORE gravity/movement is applied to
-# `velocity` -- adds buoyant float force and damps velocity while submerged.
+# Call once per physics frame INSTEAD of applying get_gravity() yourself. On land this is plain
+# gravity (skipped while on the floor). In water it is the gradual sink: constant pull down plus
+# drag on the whole velocity, so you ease toward the bottom and horizontal motion is slowed.
 
-func _apply_buoyancy(delta: float) -> void:
-	fluid_interactor.process(global_transform, FLUID_MASS)
-	# Gated on fluid_buoyancy_scale too, not just float_force -- float_force is raw
-	# Archimedes physics and is non-zero any time we're submerged at all, regardless of
-	# fluid_buoyancy_scale. Without this second check, setting the scale to 0 to test "no
-	# buoyancy" still ran the damping line below every frame, which fights gravity on its
-	# own and made the scale look like it was doing nothing.
-	if not fluid_interactor.float_force.is_zero_approx() and fluid_buoyancy_scale > 0.0:
-		velocity += fluid_interactor.float_force * fluid_buoyancy_scale * delta * delta / FLUID_MASS
+func _apply_gravity(delta: float) -> void:
+	if is_in_fluid():
+		velocity.y -= sink_accel * delta
 		velocity += -velocity * fluid_damp * delta
+		return
+	if not is_on_floor():
+		velocity += get_gravity() * delta
+
+# Where we test "am I in the water": the centre of our collision shape (falls back to our origin).
+func water_probe_position() -> Vector3:
+	return _water_probe.global_position if _water_probe != null else global_position
 
 func is_in_fluid() -> bool:
-	for floater in fluid_interactor.get_floaters():
-		if floater.is_in_fluid():
-			return true
-	return false
+	if fluid_area == null:
+		return false
+	var p := water_probe_position()
+	return p.y <= fluid_area.get_surface_height(p) - wade_depth
 
 # Called by FluidArea3D.body_enter/body_exit via duck typing.
 func fluid_area_enter(area: FluidArea3D) -> void:
-	fluid_interactor.fluid_area_enter(area)
+	fluid_area = area
 
 func fluid_area_exit(area: FluidArea3D) -> void:
-	fluid_interactor.fluid_area_exit(area)
+	if fluid_area == area:
+		fluid_area = null
 
 # Shared physical push logic for resource props -- reads this frame's actual
 # collisions (see class comment). Call this AFTER move_and_slide().

@@ -82,11 +82,9 @@ func _exit_tree():
 		builder.release_citizen(data.id)
 
 func _physics_process(delta):
-	_apply_buoyancy(delta) # see carrier.gd -- must run before gravity/movement
+	_apply_gravity(delta) # see carrier.gd -- gradual sink in water, normal gravity on land
 	
-	# Gravity
-	if not is_on_floor():
-		velocity += get_gravity() * delta
+	# (gravity / sinking is applied above by _apply_gravity())
 	
 	# Periodically re-check whether this citizen is currently housed.
 	# NOTE: job assignment is intentionally NOT auto-retried here -- per the

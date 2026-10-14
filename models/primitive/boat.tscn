@@ -152,16 +152,18 @@ collision_mask = 3
 mass = 0.4
 script = ExtResource("1_1mjqo")
 
-[node name="FloaterBowPort" type="Marker3D" parent="."]
+[node name="Floaters" type="Node3D" parent="." unique_id=2114657026]
+
+[node name="BowPort" type="Marker3D" parent="Floaters" unique_id=2015745117]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, 1.1)
 
-[node name="FloaterBowStarboard" type="Marker3D" parent="."]
+[node name="BowStarboard" type="Marker3D" parent="Floaters" unique_id=718512732]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0, 1.1)
 
-[node name="FloaterSternPort" type="Marker3D" parent="."]
+[node name="SternPort" type="Marker3D" parent="Floaters" unique_id=1428544451]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -0.6, 0, -1.3)
 
-[node name="FloaterSternStarboard" type="Marker3D" parent="."]
+[node name="SternStarboard" type="Marker3D" parent="Floaters" unique_id=26344226]
 transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0.6, 0, -1.3)
 
 [node name="Base" type="MeshInstance3D" parent="." unique_id=1139694748]

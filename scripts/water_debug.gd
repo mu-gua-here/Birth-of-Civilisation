@@ -193,21 +193,18 @@ func _redraw() -> void:
 
 
 func _draw_carrier(carrier: Carrier, verts: PackedVector3Array, colors: PackedColorArray) -> void:
-	var interactor := carrier.fluid_interactor
 	var xf := carrier.global_transform
-	var radius_scale: float = xf.basis.get_scale().y
 	var lines: Array[String] = []
-	for floater in interactor.get_floaters():
-		var wp: Vector3 = xf * floater.position
-		var surface := _fluid.get_height(wp)
-		var col := COLOR_IN if floater.is_in_fluid() else COLOR_OUT
-		var r: float = maxf(floater.radius * radius_scale, 0.05)
-		# Cross at the floater centre, plus a line to the surface directly above/below it
-		_line(verts, colors, wp - Vector3(r, 0, 0), wp + Vector3(r, 0, 0), col)
-		_line(verts, colors, wp - Vector3(0, r, 0), wp + Vector3(0, r, 0), col)
-		_line(verts, colors, wp - Vector3(0, 0, r), wp + Vector3(0, 0, r), col)
-		_line(verts, colors, wp, Vector3(wp.x, surface, wp.z), col)
-		lines.append("floater y=%.2f  surface=%.2f  diff=%+.2f" % [wp.y, surface, wp.y - r - surface])
+	var wp: Vector3 = carrier.water_probe_position()
+	var surface := _fluid.get_surface_height(wp) - carrier.wade_depth
+	var col := COLOR_IN if carrier.is_in_fluid() else COLOR_OUT
+	var r := 0.25
+	# Cross at the probe point, plus a line to the surface directly above/below it
+	_line(verts, colors, wp - Vector3(r, 0, 0), wp + Vector3(r, 0, 0), col)
+	_line(verts, colors, wp - Vector3(0, r, 0), wp + Vector3(0, r, 0), col)
+	_line(verts, colors, wp - Vector3(0, 0, r), wp + Vector3(0, 0, r), col)
+	_line(verts, colors, wp, Vector3(wp.x, surface, wp.z), col)
+	lines.append("probe y=%.2f  surface=%.2f  diff=%+.2f" % [wp.y, surface, wp.y - surface])
 
 	var label: Label3D = _labels.get(carrier)
 	if label == null or not is_instance_valid(label):
@@ -222,9 +219,9 @@ func _draw_carrier(carrier: Carrier, verts: PackedVector3Array, colors: PackedCo
 		_labels[carrier] = label
 	label.visible = true
 	label.global_position = xf.origin + Vector3(0, 1.2, 0)
-	var area_state := "area=%s" % ("none" if interactor.fluid_area == null else "set")
-	label.text = "%s\n%s  in_fluid=%s\nforce_y=%.1f\n%s" % [
-		carrier.name, area_state, carrier.is_in_fluid(), interactor.float_force.y, "\n".join(lines)]
+	var area_state := "area=%s" % ("none" if carrier.fluid_area == null else "set")
+	label.text = "%s\n%s  in_fluid=%s\nvel_y=%.2f\n%s" % [
+		carrier.name, area_state, carrier.is_in_fluid(), carrier.velocity.y, "\n".join(lines)]
 
 
 func _update_hud(camera: Camera3D, focus: Vector3) -> void:
@@ -244,7 +241,7 @@ func _update_hud(camera: Camera3D, focus: Vector3) -> void:
 		text += "camera y=%.3f  surface=%.3f  -> %s\n" % [cam.y, cs, "UNDERWATER" if cam.y <= cs else "above water"]
 	text += "carriers tracked: %d\n" % _carriers.size()
 	text += "grid: cyan=visible surface  magenta=effective (wading) surface, offset %.2f\n" % _fluid.physics_offset
-	text += "yellow=trigger box  red/green=floater in/out"
+	text += "yellow=trigger box  red/green=body in/out of water"
 	_hud.text = text
 
 

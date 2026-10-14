@@ -35,7 +35,7 @@ shader_parameter/roughness = 0.250000011875
 shader_parameter/water_alpha = 1.0
 shader_parameter/underwater_alpha = 0.90000004275
 shader_parameter/wave_a = PackedVector4Array(1, 0, 0.19634955, 0.25, 0.76604444, 0.64278764, 0.2991993, 0.15, 0.81915206, -0.57357645, 0.44879895, 0.08, 0.17364818, 0.9848077, 0.6981317, 0.04)
-shader_parameter/wave_phase = Vector4(4.5505314, 0.44983047, 0.8962337, 0.96533865)
+shader_parameter/wave_phase = Vector4(2.252119, 4.0092497, 4.064726, 0.5524401)
 shader_parameter/foam_distance = 0.05
 shader_parameter/foam_stepping = 100.0
 shader_parameter/depth_distance = 4.0
@@ -140,7 +140,6 @@ environment = ExtResource("3_gqmmt")
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
-time_of_day = 0.405
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
 horizon_light_energy = 2.0

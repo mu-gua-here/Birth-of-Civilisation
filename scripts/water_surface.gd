@@ -10,13 +10,6 @@ class_name WaterSurface
 ## The visible surface is a camera-following grid whose vertices sit on a WORLD lattice
 ## (multiples of cell_size), so waves never swim when the grid re-snaps. Plain sines only,
 ## no hash noise, no floor() stepping: the low-poly look is coarse cells + flat normals.
-##
-## This is a @tool script: in the editor it follows the editor's 3D camera and draws the same
-## mesh. The grid mesh is a runtime child that is never saved into the scene, and this node's
-## own transform is never touched. Wave animation in the editor is off by default
-## (`animate_in_editor`) because the editor viewport only redraws on input anyway.
-##
-## The node's Y is NOT used; set `sea_level`.
 
 const WAVE_COUNT := 4 # must match wave_a[4] in the shader
 const GRAVITY := 9.81
@@ -56,12 +49,12 @@ const GRID_NODE_NAME := "WaterGridMesh"
 		directions_deg = v
 		_dirty = true
 ## Metres crest to crest. Keep each >= 4 * cell_size or the grid can't represent it.
-@export var wavelengths := PackedFloat32Array([32.0, 21.0, 14.0, 9.0]):
+@export var wavelengths := PackedFloat32Array([32.0, 40.0, 36.0, 48.0]):
 	set(v):
 		wavelengths = v
 		_dirty = true
 ## Metres (half of crest-to-trough).
-@export var amplitudes := PackedFloat32Array([0.25, 0.15, 0.08, 0.04]):
+@export var amplitudes := PackedFloat32Array([0.5, 0.5, 0.16, 0.08]):
 	set(v):
 		amplitudes = v
 		_dirty = true

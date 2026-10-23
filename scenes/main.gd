@@ -15,13 +15,13 @@ extends Node3D
 @onready var _underwater_overlay := get_node_or_null("View/Camera/UnderwaterOverlay") as MeshInstance3D
 
 var _camera_in_fluid := false
+var _camera_water_level := 0.0 # surface height above the camera, set by _query_camera_in_fluid()
 var _baseline_ambient_energy: float
 
 func _ready():
 	if world_environment_node == null:
 		world_environment_node = $WorldEnvironment
 	_swap_environment_for_renderer()
-	_apply_web_quality()
 	# Run after DayNightCycle (default process_priority 0) so whenever we
 	# read the environment's "current" values this frame, they're already
 	# this frame's fresh day/night numbers, not last frame's.
@@ -60,11 +60,9 @@ func _process(_delta: float) -> void:
 		var mat := _underwater_overlay.material_override as ShaderMaterial
 		if mat:
 			mat.set_shader_parameter("light_level", light)
-			# Surface height right above the camera (includes waves) so only the
-			# below-water part of each view ray gets tinted.
-			var water := get_node_or_null("WaterSurface")
-			var cam_pos: Vector3 = camera.global_position
-			mat.set_shader_parameter("water_level", water.height_at(cam_pos.x, cam_pos.z) if water else cam_pos.y + 1.0)
+			# Surface right above the camera, ocean waves or river, whichever FluidArea3D reports,
+			# so only the below-water part of each view ray gets tinted.
+			mat.set_shader_parameter("water_level", _camera_water_level)
 
 # --- Debug perf A/B (debug builds only). Stand where fps drops, press one key at a time:
 #   F1 3D render scale 1.0/0.75/0.5   F2 shadow splits 1/2/4   F3 MSAA on/off
@@ -101,28 +99,6 @@ func _unhandled_input(event: InputEvent) -> void:
 			print("[perf] MSAA = ", "2x" if vp.msaa_3d == Viewport.MSAA_2X else "off")
 		KEY_F5:
 			_dbg_fps_log = not _dbg_fps_log
-
-func _apply_web_quality() -> void:
-	# Shadow bias applies everywhere: the stripes on gentle terrain slopes are shadow acne (the
-	# surface shadowing itself because the depth comparison is too tight), fixed by pushing the
-	# receiver out along its normal. Tune these two in code or per-light in the inspector.
-	var sun := get_node_or_null("Sun") as DirectionalLight3D
-	if sun:
-		sun.shadow_bias = 0.1
-		sun.shadow_normal_bias = 3.0
-
-	# Web/WebGL2 is far more fill-rate and draw-call bound than native. Everything below is
-	# web-only; native keeps its project settings untouched.
-	if not OS.has_feature("web"):
-		return
-	# MSAA on a HiDPI (retina) canvas is one of the biggest fill-rate costs in a browser.
-	get_viewport().msaa_3d = Viewport.MSAA_DISABLED
-	# Each PSSM split re-renders every shadow caster; the default is 4. Two splits over a
-	# shorter distance is much cheaper for a third-person camera this close to the ground.
-	if sun:
-		sun.directional_shadow_mode = DirectionalLight3D.SHADOW_PARALLEL_2_SPLITS
-		sun.directional_shadow_max_distance = 80.0
-	RenderingServer.directional_shadow_atlas_set_size(4096, true)
 
 func _swap_environment_for_renderer() -> void:
 	# Compatibility ("gl_compatibility") and Forward+ ("forward_plus") render
@@ -164,6 +140,8 @@ func _query_camera_in_fluid(camera: Camera3D) -> bool:
 			# The Area3D shape is only a coarse trigger volume (much taller than the real
 			# water -- see FluidArea3D's own class comment), so being inside IT isn't the
 			# same as being underwater
-			if camera.global_position.y <= collider.get_surface_height(camera.global_position):
+			var surface: float = collider.get_surface_height(camera.global_position)
+			if camera.global_position.y <= surface:
+				_camera_water_level = surface
 				return true
 	return false

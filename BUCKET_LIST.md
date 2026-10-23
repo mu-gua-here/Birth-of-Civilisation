@@ -8,10 +8,10 @@ Used to keep track of what needs to be done
 	
 	### HIGH PRIORITY
 	1. Add trees/grass/bushes as food source/materials/decor (as navobstacles to terrain)
-	2. Replace the capsule bodies with actual humanoids
 	
 	### MID PRIORITY
 	1. HUD when player takes damage, is about to run out of energy, etc
+	2. Replace the capsule bodies with actual humanoids
 	
 	### LOW PRIORITY
 	1. Citizen behaviour
@@ -20,7 +20,7 @@ Used to keep track of what needs to be done
 ## BUGS
 	
 	### HIGH PRIORITY
-	1. 
+	1. Darker plane appearing beneath ocean surface
 	
 	### MID PRIORITY
 	1. 
@@ -31,13 +31,13 @@ Used to keep track of what needs to be done
 ## IMPROVEMENTS
 
 	### HIGH PRIORITY
-	1. Allow player and NPCs to be able to be pushed
+	1. 
 	
 	### MID PRIORITY
-	1. Add UI
+	1. 
 	
 	### LOW PRIORITY
 	1. 
 
 ## CODEBASE TIDINESS
-	1. Forked fluid_area_3d.gd files in scripts/, original in floatable/
+	1. 

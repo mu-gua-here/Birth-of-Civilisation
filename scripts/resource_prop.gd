@@ -6,7 +6,7 @@ extends RigidBody3D
 ## Builder.add_chop_progress() / _spawn_incremental_resource_props().
 ##
 ## Nothing auto-carries these -- the player/citizens have to physically
-## PUSH them via real contact (see Carrier._push_colliding_resource_props())
+## PUSH them via real contact (see Carrier._push_colliding_bodies())
 ## wherever they're needed (the shared stockpile point for now, but later a
 ## construction site or anywhere else -- they stay fully mobile forever, no
 ## freezing/parking in one spot). Once a prop passes within COLLECT_RADIUS
@@ -23,7 +23,13 @@ const SETTLE_SPEED_THRESHOLD := 0.4
 
 var collected: bool = false
 
+func _ready() -> void:
+	# Needed so get_colliding_bodies() works -- lets us shove Carriers (see PhysicsPush.solve_rigid_contacts()).
+	contact_monitor = true
+	max_contacts_reported = 8
+
 func _physics_process(_delta: float) -> void:
+	PhysicsPush.solve_rigid_contacts(self)
 	if collected:
 		return
 	var flat_pos := global_position

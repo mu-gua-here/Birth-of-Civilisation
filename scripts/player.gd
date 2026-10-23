@@ -5,6 +5,9 @@ var plane := Plane(Vector3.UP, Vector3.ZERO) # y=0 plane, used to turn mouse cli
 @export var view_node: Node3D
 
 const NO_ID := Builder.NO_ID
+# Walking/running top speed in m/s per unit of SPEED (kept from the old per-frame accumulation,
+# where friction 0.8 settled at about 4x the per-frame input).
+const WALK_SPEED_SCALE := 4.0
 
 # Gathering / building (click-and-hold). A non-empty target id means the task is active.
 var gather_target_id: String = NO_ID
@@ -18,7 +21,8 @@ var spawn_point: Vector3
 
 # Player physical movement
 @export_category("Physics")
-@export var SPEED := 0.5
+@export var SPEED := 0.8
+@export var RUN_SPEED := 1.2
 @export var SWIM_SPEED := 0.5
 @export var JUMP_HEIGHT := 5.0
 @export var FRICTION := 0.8
@@ -28,6 +32,7 @@ var bounce_active := false
 
 @export_category("Mechanics")
 @export var fall_dmg_threshold := 10.0
+@export var hunger_dmg := 0.2
 
 # Player physiological settings. Assign to health/energy directly -- the setters
 # clamp, emit health_changed and handle death.
@@ -41,14 +46,14 @@ var bounce_active := false
 			_on_death()
 
 @export var heal_rate := 0.1
-@export var heal_energy := 0.1
+@export var heal_energy := 0.05
 
-@export_range(0.0, 100.0) var energy: float = 100.0:
+@export_range(0.0, 100.0) var energy: float = 80.0:
 	set(value):
 		energy = clampf(value, 0.0, 100.0)
 @export var invuln_time: float = 0.5  # seconds of immunity after being hit
 var invuln_timer: float = 0.0
-@export var metabolism: float = 0.001
+@export var metabolism: float = 0.01
 @export var move_energy := 0.1
 
 # Knockback
@@ -69,6 +74,7 @@ func _ready():
 	_carrier_ready() # sets `builder` (see carrier.gd)
 
 func _physics_process(delta: float) -> void:
+	
 	if not dev_mode:
 		_apply_gravity(delta) # see carrier.gd -- gradual sink in water, normal gravity on land
 	
@@ -80,7 +86,8 @@ func _physics_process(delta: float) -> void:
 	# ENERGY MECHANICS
 	
 	# Tiredness slows movement and weakens jumps
-	var energy_mult := clampf(energy * 0.02, 0.25, 1.0)
+	# Slow down player when insufficient energy
+	var energy_mult := lerpf(0.25, 1.25, energy * 0.01)
 	
 	# Jump (solid ground only -- swimming is handled by the swim_up/swim_down axis below)
 	var just_jumped := false
@@ -97,16 +104,22 @@ func _physics_process(delta: float) -> void:
 	var move_vec := Vector3(input_dir.x, up_down if in_fluid or dev_mode else 0.0, input_dir.y)
 	var direction := move_vec.rotated(Vector3.UP, view_node.rotation.y if view_node else 0.0).normalized()
 	
-	var speed: float = (DEV_SPEED if dev_mode else SPEED) * (2.0 if Input.is_action_pressed("run") else 1.0)
+	# Run & walk speed
+	var speed: float = RUN_SPEED if Input.is_action_pressed("run") else SPEED
+	# Mult for dev_mode
+	speed *= DEV_SPEED if dev_mode else SPEED
+	
+	# Horizontal movement steers toward the wanted velocity (see Carrier.steer_horizontal) instead of
+	# piling onto velocity, so outside impacts can be steered against and decay normally.
+	var wanted := Vector3(direction.x, 0.0, direction.z) * speed * energy_mult * WALK_SPEED_SCALE
+	steer_horizontal(wanted, delta)
 	if not direction.is_zero_approx():
-		velocity.x += direction.x * speed
-		velocity.z += direction.z * speed
 		if dev_mode:
-			velocity.y += direction.y * speed
+			velocity += direction * speed
 		elif in_fluid:
-			velocity.y += direction.y * SWIM_SPEED
-		# Subtract energy when movement is done by player
-		energy -= move_energy * delta
+			velocity.y += direction.y * SWIM_SPEED * energy_mult
+			# Subtract energy when movement is done by player
+			energy -= move_energy * delta
 	
 	# Small bounce animation while walking (skipped on the frame a jump already set velocity.y)
 	if is_on_floor():
@@ -115,18 +128,11 @@ func _physics_process(delta: float) -> void:
 				velocity.y += BOUNCE_HEIGHT - (2.0 * WATER_RESISTANCE if in_fluid else 0.0)
 				bounce_active = true
 	
-	velocity.x *= FRICTION
-	if dev_mode: velocity.y *= FRICTION
-	velocity.z *= FRICTION
-	
-	# Slow down player when insufficient energy
-	if energy < 50.0:
-		velocity.x *= energy_mult
-		velocity.z *= energy_mult
+	if dev_mode: velocity *= FRICTION
 	
 	# Start eating away at health once at critical levels
 	if energy < 30.0:
-		health -= 0.1 * delta
+		health -= hunger_dmg * delta
 	
 	# Knockback from attackers, decaying over time
 	if knockback.length() > 0.01:
@@ -142,20 +148,25 @@ func _physics_process(delta: float) -> void:
 	_update_gathering(delta)
 	_update_building_task(delta)
 	
+	_before_slide() # records pre-slide velocity for the push logic, see carrier.gd
+	
 	# Fall damage needs the speed before move_and_slide() zeroes it on landing
 	var fall_speed := -velocity.y
 	move_and_slide()
 	if not dev_mode:
-		if (is_on_floor() or is_in_fluid()) and fall_speed > fall_dmg_threshold:
+		if (is_on_floor() or in_fluid) and fall_speed > fall_dmg_threshold:
 			# Twice as less damage when falling on water than on land
-			var damage = 1.5 * (fall_speed - fall_dmg_threshold) * (2 - int(is_in_fluid()))
+			var damage = 1.5 * (fall_speed - fall_dmg_threshold) * (2 - int(in_fluid))
 			health -= damage
 	
-	_push_colliding_resource_props() # see carrier.gd -- must run AFTER move_and_slide()
+	_push_colliding_bodies() # move any moveable objects on player collision
 	
 	# Heal player if not at max health
-	health += heal_rate * delta
-	if health < 100.0: energy -= heal_energy * delta
+	if health < 100.0 and health > 30.0:
+		health += heal_rate * delta
+		energy -= heal_energy * delta
+	
+	energy -= metabolism * delta
 
 # Called by attackers (e.g. angry citizens). Ignored while invulnerable.
 func take_damage(amount: float, source_position: Vector3 = global_position, knockback_force: float = 4.0) -> void:
@@ -178,6 +189,10 @@ func _on_death() -> void:
 	velocity = Vector3.ZERO
 	knockback = Vector3.ZERO
 	health = max_health
+	
+func _unhandled_key_input(event: InputEvent) -> void:
+	if event.keycode == KEY_F8 and not (event is InputEventKey and event.pressed and not event.echo):
+		dev_mode = not dev_mode
 
 func _unhandled_input(event: InputEvent) -> void:
 	# Click-AND-HOLD to gather a resource OR help build a construction site --

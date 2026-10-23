@@ -7,12 +7,6 @@ class_name Builder
 
 var map: DataMap
 
-# Cached LowPolyTerrainManager, resolved lazily on first use (the scene tree may not
-# be fully ready the instant _ready() runs). Used to snap freeform placement/preview
-# to actual ground height -- see _get_terrain_height().
-var _terrain_manager: Node = null
-var _terrain_lookup_done := false
-
 var index: int = 0 # Index of structure being built
 
 @export var selector: Node3D # The 'cursor'
@@ -173,67 +167,6 @@ func _build_trimesh_collision_body(scene: PackedScene) -> StaticBody3D:
 	body.add_child(collider)
 	return body
 
-func _bake_nav():
-	if nav_region == null or nav_region.navigation_mesh == null:
-		return
-
-	nav_region.navigation_mesh.geometry_parsed_geometry_type = NavigationMesh.PARSED_GEOMETRY_STATIC_COLLIDERS
-	# Layer 1: ground layer
-	nav_region.navigation_mesh.geometry_collision_mask = 1
-
-	var half_extent = worldSize + 1.0  # small margin past the playable area
-	if half_extent <= 1.0:
-		half_extent = _estimate_world_half_extent() + 1.0
-	nav_region.navigation_mesh.filter_baking_aabb = AABB(
-		Vector3(-half_extent, -2.0, -half_extent),
-		Vector3(half_extent * 2.0, 4.0, half_extent * 2.0)
-	)
-
-	# on_thread=true bakes off the main thread and only touches the navmesh once done,
-	# so a rebake triggered by chunk streaming doesn't stall gameplay for a frame.
-	nav_region.bake_navigation_mesh(true)
-
-func _estimate_world_half_extent() -> float:
-	if nav_region == null:
-		return 250.0
-	var terrain := _find_terrain_manager(nav_region)
-	if terrain == null or not ("world_chunks" in terrain):
-		return 250.0
-	var meters_per_chunk: float = float(terrain.chunk_size) * terrain.cell_size
-	return max(terrain.world_chunks.x, terrain.world_chunks.y) * meters_per_chunk * 0.5
-
-func _find_terrain_manager(root: Node) -> Node:
-	if root is LowPolyTerrainManager:
-		return root
-	for child in root.get_children():
-		var found := _find_terrain_manager(child)
-		if found:
-			return found
-	return null
-
-# Resolves and caches the scene's LowPolyTerrainManager the first time it's needed,
-# searching from the current scene root rather than nav_region (which isn't always
-# wired up) -- same pattern as TerrainChunkLoader._find_terrain_manager().
-func _get_terrain_manager() -> Node:
-	if not _terrain_lookup_done:
-		_terrain_lookup_done = true
-		_terrain_manager = _find_terrain_manager(get_tree().current_scene)
-	return _terrain_manager
-
-# Snaps a flat y=0-plane raycast hit onto the real terrain surface. Building used to
-# place everything on a flat plane (see action_build's old comment); now that the
-# world has real LowPolyTerrain geometry, structures/the selector need to follow
-# actual ground height instead of floating at y=0 or burying into hills.
-func _get_terrain_height(pos: Vector3) -> float:
-	var terrain := _get_terrain_manager()
-	if terrain == null:
-		return pos.y
-	if terrain.has_method("is_inside_terrain") and not terrain.is_inside_terrain(pos.x, pos.z):
-		return pos.y # outside the authored terrain -- leave whatever height the plane gave us
-	if terrain.has_method("get_height_at_world_position"):
-		return terrain.get_height_at_world_position(pos)
-	return pos.y
-
 # Public entry point so anything else that changes the walkable world -- placing/removing
 # a structure, or a terrain chunk streaming in/out (see TerrainChunkLoader) -- can ask for
 # a rebake without duplicating the debounce logic below.
@@ -262,11 +195,7 @@ func _process(delta):
 	action_save() # Saving
 	action_load() # Loading
 
-	# Freeform placement position based on mouse -- raycasts against the y=0
-	# plane to get X/Z, then _get_terrain_height() below re-snaps Y onto the
-	# real LowPolyTerrain surface via get_height_at_world_position()/
-	# is_inside_terrain(), so placement follows actual ground height instead
-	# of a flat plane.
+	# Freeform placement position based on mouse -- raycasts against the y=0 plane to get X/Z
 	var world_position = plane.intersects_ray(
 		view_camera.project_ray_origin(get_viewport().get_mouse_position()),
 		view_camera.project_ray_normal(get_viewport().get_mouse_position()))
@@ -274,19 +203,11 @@ func _process(delta):
 	if world_position == null:
 		return
 
-	world_position.y = _get_terrain_height(world_position)
-
 	# Only show selector and process building in building mode
 	if interact_mode:
 		selector.position = lerp(selector.position, world_position, min(delta * 40, 1.0))
 		action_build(world_position)
 		action_demolish(world_position)
-
-	if _nav_bake_pending:
-		_nav_bake_timer -= delta
-		if _nav_bake_timer <= 0.0:
-			_nav_bake_pending = false
-			_bake_nav()
 
 	_process_construction(delta)
 	_update_progress_bar_visibility()
@@ -324,9 +245,6 @@ func _spawn_structure_instance(structure_index: int, pos: Vector3, rotation_y: f
 	}
 
 	if structure.gatherable:
-		# No floor collision needed -- the LowPolyTerrain mesh owns the ground.
-		# Just a physical blocker + live nav avoidance, same trick as the old
-		# per-cell tree obstacle system, keyed by id/position instead.
 		var sh_result = get_collision_shape_from_scene(structure.model)
 		var body := StaticBody3D.new()
 		body.collision_layer = TREE_COLLISION_LAYER

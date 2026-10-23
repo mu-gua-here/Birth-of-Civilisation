@@ -9,6 +9,7 @@ ground_curve = 0.17
 
 [sub_resource type="Sky" id="Sky_8xld4"]
 sky_material = SubResource("ProceduralSkyMaterial_native")
+radiance_size = 0
 
 [resource]
 background_mode = 2
@@ -35,5 +36,5 @@ fog_density = 0.05
 fog_aerial_perspective = 1.0
 fog_sky_affect = 0.5
 fog_height = 10.0
-fog_height_density = -0.1
+fog_height_density = -0.05
 fog_depth_begin = 0.0

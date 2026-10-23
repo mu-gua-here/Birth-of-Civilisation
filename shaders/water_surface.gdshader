@@ -15,7 +15,7 @@ uniform vec3 deep_water_color : source_color = vec3(0.0, 0.6, 0.9);
 uniform vec3 shallow_water_color : source_color = vec3(0.0, 0.6, 0.7);
 uniform vec3 foam_color : source_color = vec3(0.9, 0.95, 1.0);
 uniform float roughness : hint_range(0.0, 1.0) = 0.5;
-uniform float water_alpha : hint_range(0.0, 1.0) = 1.0;
+uniform float water_alpha : hint_range(0.0, 1.0) = 0.3;
 uniform float underwater_alpha : hint_range(0.0, 1.0) = 0.8; // surface opacity when viewed from below
 
 // Set by WaterSurface -- do not edit by hand.
@@ -73,9 +73,16 @@ void fragment() {
 #else
 	vec3 ndc = vec3(SCREEN_UV * 2.0 - 1.0, depth);
 #endif
-	vec4 upos = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
-	vec3 pixel_position = upos.xyz / upos.w;
-	float water_depth = abs(pixel_position.z - VERTEX.z);
+	float water_depth = depth_distance;
+	if (depth > 0.0 && depth < 1.0) {
+		vec4 upos = INV_PROJECTION_MATRIX * vec4(ndc, 1.0);
+		vec3 pixel_position = upos.xyz / upos.w;
+		water_depth = abs(pixel_position.z - VERTEX.z);
+	}
+	// NaN/inf guard. !(x < y) is true for NaN, which a plain comparison would miss.
+	if (!((water_depth < 1e4) || isnan(water_depth) || isinf(water_depth))) {
+		water_depth = depth_distance;
+	}
 
 	float depth_blend = clamp(water_depth / depth_distance, 0.0, 1.0);
 	vec3 water_base = mix(shallow_water_color, deep_water_color, depth_blend);

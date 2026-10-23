@@ -8,12 +8,6 @@ extends Area3D
 @export var density: float = 1.0
 @export var simulate_turbulence := true
 
-# Wave params -- MUST match the ShaderMaterial on the visible ocean mesh
-# (addons/lowpolyterrain/shader/water.gdshader, Wave_Settings group) or this
-# will drift out of sync with what's rendered again. Copy the tuned values
-# from that material's Inspector into these fields by hand; there's no way
-# to read them automatically since the shader lives on a resource inside
-# terrain.res (binary, not something we script against).
 @export var wave_direction := Vector2(1.0, 1.0)
 @export var wave_speed := 1.0
 @export var wave_scale := 0.2
@@ -56,12 +50,6 @@ func body_exit(body: PhysicsBody3D) -> void:
 
 func get_height(pos: Vector3) -> float:
 	return surface_height + _low_poly_wave(Vector2(pos.x, pos.z), time)
-
-# --- Ported from water.gdshader's low_poly_wave()/hash()/value_noise() --
-# (addons/lowpolyterrain/shader/water.gdshader) -- same formula, evaluated
-# on the CPU instead of the GPU, so wave height here always matches what's
-# actually rendered instead of drifting from independent noise. Keep this
-# in sync if the shader's wave math ever changes.
 
 func _fract(x: float) -> float:
 	return x - floor(x)

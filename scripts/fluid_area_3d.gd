@@ -21,7 +21,6 @@ class_name FluidArea3D
 ## Extra room above the highest possible wave so a body riding a crest never leaves the volume.
 @export var headroom := 2.0
 
-
 func _ready() -> void:
 	if water_surface == null:
 		water_surface = _find_water_surface(get_tree().current_scene)
@@ -53,17 +52,10 @@ func get_height(pos: Vector3) -> float:
 ## The visible surface (exactly what the shader draws). Use for the underwater camera check
 ## and for floating objects that should ride on the waves.
 func get_surface_height(pos: Vector3) -> float:
-	if water_surface == null:
-		return 0.0
-	return water_surface.height_at(pos.x, pos.z)
-
-
-func describe_source() -> String:
-	if water_surface == null:
-		return "NONE (returning 0)"
-	return "WaterSurface '%s' sea_level=%.2f max_wave=%.2f" % [
-		water_surface.name, water_surface.sea_level, water_surface.max_amplitude()]
-
+	var h := 0.0
+	if water_surface != null:
+		h = water_surface.height_at(pos.x, pos.z)
+	return h
 
 ## The old setup left the box top at an arbitrary height (+5 in main.tscn) unrelated to the
 ## water, so a body on a tall crest could fall outside the volume and silently lose buoyancy.

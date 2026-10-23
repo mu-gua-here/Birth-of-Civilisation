@@ -1,0 +1,48 @@
+[gd_scene format=3 uid="uid://d1co8unojttsi"]
+
+[ext_resource type="Script" uid="uid://dc818y4dgir2s" path="res://addons/floatable_body/floatable_body_3d.gd" id="1_x8fbi"]
+[ext_resource type="Script" path="res://scripts/push_source.gd" id="2_pushsrc"]
+
+[sub_resource type="SphereMesh" id="SphereMesh_7d2os"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_41u45"]
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_x8fbi"]
+noise = SubResource("FastNoiseLite_41u45")
+seamless = true
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_hgol0"]
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_41u45"]
+
+[sub_resource type="FastNoiseLite" id="FastNoiseLite_hgol0"]
+
+[sub_resource type="NoiseTexture2D" id="NoiseTexture2D_ktgx5"]
+noise = SubResource("FastNoiseLite_hgol0")
+seamless = true
+as_normal_map = true
+bump_strength = 12.0
+
+[sub_resource type="StandardMaterial3D" id="StandardMaterial3D_y1j5s"]
+albedo_color = Color(0.47464764, 0.44426292, 0.42658293, 1)
+albedo_texture = SubResource("NoiseTexture2D_x8fbi")
+normal_enabled = true
+normal_texture = SubResource("NoiseTexture2D_ktgx5")
+detail_mask = SubResource("NoiseTexture2D_hgol0")
+detail_normal = SubResource("NoiseTexture2D_41u45")
+
+[sub_resource type="SphereShape3D" id="SphereShape3D_7d2os"]
+
+[node name="Boulder" type="RigidBody3D" unique_id=582864386]
+script = ExtResource("1_x8fbi")
+metadata/_custom_type_script = "uid://dc818y4dgir2s"
+
+[node name="MeshInstance3D" type="MeshInstance3D" parent="." unique_id=1499259155]
+mesh = SubResource("SphereMesh_7d2os")
+surface_material_override/0 = SubResource("StandardMaterial3D_y1j5s")
+
+[node name="CollisionShape3D" type="CollisionShape3D" parent="." unique_id=547233045]
+shape = SubResource("SphereShape3D_7d2os")
+
+[node name="PushSource" type="Node" parent="." unique_id=717201001]
+script = ExtResource("2_pushsrc")

@@ -20,6 +20,9 @@ const WORK_REACH := 1.5
 @export var attack_cooldown_time: float = 1.0  # seconds between hits on the same target
 @export var attack_knockback_force: float = 0.5
 var attack_cooldown: float = 0.0
+# Horizontal velocity the citizen wants this frame (from navigation/avoidance). Velocity steers toward it
+# (see Carrier.steer_horizontal), so an impact can be steered against instead of being overwritten.
+var _wanted_velocity := Vector3.ZERO
 
 @onready var nav_agent = $NavigationAgent3D
 @onready var mesh_instance: MeshInstance3D = $MeshInstance3D
@@ -154,31 +157,31 @@ func _physics_process(delta):
 		# unreachable and querying it every frame is what spams the engine error. Just coast
 		# to a stop instead of repeatedly asking for a path that will never exist.
 		if not nav_agent.is_target_reachable():
-			velocity.x = move_toward(velocity.x, 0, actual_speed)
-			velocity.z = move_toward(velocity.z, 0, actual_speed)
+			_wanted_velocity = Vector3.ZERO
 		else:
 			var next = nav_agent.get_next_path_position()
 			var direction = (next - global_position).normalized()
-			var desired_velocity = Vector3(direction.x * actual_speed, velocity.y, direction.z * actual_speed)
+			var desired_velocity := Vector3(direction.x * actual_speed, 0.0, direction.z * actual_speed)
 			if nav_agent.avoidance_enabled:
-				nav_agent.set_velocity(desired_velocity)  # triggers velocity_computed signal
+				nav_agent.set_velocity(desired_velocity)  # triggers velocity_computed -> _wanted_velocity
 			else:
-				velocity = desired_velocity
+				_wanted_velocity = desired_velocity
 	else:
-		velocity.x = move_toward(velocity.x, 0, actual_speed)
-		velocity.z = move_toward(velocity.z, 0, actual_speed)
+		_wanted_velocity = Vector3.ZERO
 	
 	# Slow citizen if citizen need food
+	var wanted := _wanted_velocity
 	if data.energy < 50.0:
 		var energy_mult = clamp(data.energy * 0.02, 0.25, 1.0)
-		velocity.x *= energy_mult
-		velocity.z *= energy_mult
+		wanted *= energy_mult
 	
 	data.energy -= (data.metabolism + data.metabolism * Vector3(velocity.x, 0, velocity.z).length()) * delta
 	data.energy = clamp(data.energy, 0, 100)
 	
+	steer_horizontal(wanted, delta)
+	_before_slide()
 	move_and_slide()
-	_push_colliding_resource_props() # shared with player.gd, see carrier.gd -- must run AFTER move_and_slide() to read this frame's collisions
+	_push_colliding_bodies() # shared with player.gd, see carrier.gd -- must run AFTER move_and_slide() to read this frame's collisions
 	
 	# Real physical collision check — did we actually touch the player this frame?
 	if is_chasing_player and attack_cooldown <= 0.0:
@@ -196,8 +199,7 @@ func _physics_process(delta):
 		position = Vector3(randf_range(-5, 5), 1, randf_range(-5, 5))
 
 func _on_velocity_computed(safe_velocity: Vector3):
-	velocity.x = safe_velocity.x
-	velocity.z = safe_velocity.z
+	_wanted_velocity = Vector3(safe_velocity.x, 0.0, safe_velocity.z)
 
 # Derives housing status directly from builder.buildings (the source of
 # truth for occupancy) instead of a since-removed has_housing_for() call.

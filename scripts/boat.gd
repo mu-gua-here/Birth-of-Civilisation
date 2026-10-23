@@ -26,6 +26,8 @@ var _floaters: Array[Vector3] = [] # local to the body
 
 func _ready() -> void:
 	can_sleep = false # a sleeping body would ignore waves until something bumped it
+	contact_monitor = true # lets us shove Carriers on contact (see PhysicsPush.solve_rigid_contacts())
+	max_contacts_reported = 8
 	var inv := global_transform.affine_inverse()
 	for child in $Floaters.get_children():
 		_floaters.append(inv * child.global_position)
@@ -34,6 +36,7 @@ func _ready() -> void:
 
 
 func _physics_process(_delta: float) -> void:
+	PhysicsPush.solve_rigid_contacts(self)
 	if _fluid == null or _floaters.is_empty():
 		return
 

@@ -9,7 +9,6 @@ ground_curve = 0.17
 
 [sub_resource type="Sky" id="Sky_native"]
 sky_material = SubResource("ProceduralSkyMaterial_native")
-process_mode = 2
 radiance_size = 0
 
 [resource]
@@ -32,12 +31,10 @@ glow_levels/2 = 0.6
 glow_levels/3 = 0.6
 glow_intensity = 2.0
 fog_enabled = true
-fog_light_color = Color(1, 1, 1, 1)
 fog_light_energy = 0.5
-fog_density = 0.05
 fog_sky_affect = 0.5
 fog_height = 10.0
-fog_height_density = -0.1
+fog_height_density = -0.02
 fog_depth_curve = 0.17677641
 fog_depth_begin = 0.0
 fog_depth_end = 4000.0

@@ -6,12 +6,10 @@
 [ext_resource type="PackedScene" uid="uid://dqlr0bede3xqd" path="res://scenes/player.tscn" id="2_jscy8"]
 [ext_resource type="Environment" uid="uid://jbptgqvstei3" path="res://environments/native-main-environment.tres" id="3_gqmmt"]
 [ext_resource type="Texture2D" uid="uid://cbk07cxgshg26" path="res://sprites/selector.png" id="4_wr1wv"]
-[ext_resource type="PackedScene" uid="uid://filshn1wyhbe" path="res://scenes/terrain.res" id="5_jscy8"]
 [ext_resource type="PackedScene" uid="uid://d1sw4502ux10j" path="res://models/primitive/boat.tscn" id="7_gqmmt"]
 [ext_resource type="Script" uid="uid://dec71yx4xpg2c" path="res://scripts/view.gd" id="8_yovpv"]
 [ext_resource type="Shader" uid="uid://cpxqw732s4kn1" path="res://shaders/water_surface.gdshader" id="9_pm3ni"]
 [ext_resource type="PackedScene" uid="uid://b2n3240eehfe5" path="res://models/ancient/wall.glb" id="12_yc10j"]
-[ext_resource type="Script" uid="uid://dn7i8yp68pgnm" path="res://tools/terrain_chunk_loader.gd" id="14_jscy8"]
 [ext_resource type="FontFile" uid="uid://d0cxd77jybrcn" path="res://fonts/lilita_one_regular.ttf" id="16_vlub6"]
 [ext_resource type="PackedScene" uid="uid://cwik60akjhciu" path="res://scenes/citizen.tscn" id="18_og1vs"]
 [ext_resource type="Script" uid="uid://wlstv8x8ubp6" path="res://scripts/citizen_selector.gd" id="20_tel4y"]
@@ -19,11 +17,20 @@
 [ext_resource type="Script" uid="uid://mp0ylpuofo3" path="res://scenes/audio.gd" id="24_og1vs"]
 [ext_resource type="AudioStream" uid="uid://wvfsgkl8qob6" path="res://sounds/ambience.ogg" id="24_y6deb"]
 [ext_resource type="Texture2D" uid="uid://cq3ph17sfdegf" path="res://sprites/log-icon.png" id="25_fv21b"]
+[ext_resource type="PackedScene" uid="uid://d1co8unojttsi" path="res://ball.tscn" id="25_og1vs"]
 [ext_resource type="Script" uid="uid://c6187ysfly3rv" path="res://scripts/day_night_cycle.gd" id="29_fv21b"]
 [ext_resource type="Script" uid="uid://b3g1i41ti7blf" path="res://scripts/fluid_area_3d.gd" id="31_ocean"]
 [ext_resource type="Script" uid="uid://3c7g3h8dxxjn" path="res://scripts/water_surface.gd" id="32_water_surface"]
 [ext_resource type="Script" uid="uid://b5jogbfe3oroy" path="res://scripts/water_debug.gd" id="33_water_debug"]
 [ext_resource type="Shader" uid="uid://c881bowtbvx8c" path="res://shaders/underwater.gdshader" id="34_underwater"]
+
+[sub_resource type="MeshLibrary" id="MeshLibrary_7d2os"]
+item/0/name = ""
+item/0/mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/mesh_cast_shadow = 1
+item/0/shapes = []
+item/0/navigation_mesh_transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0, 0)
+item/0/navigation_layers = 1
 
 [sub_resource type="ShaderMaterial" id="ShaderMaterial_020yl"]
 render_priority = 0
@@ -34,15 +41,18 @@ shader_parameter/foam_color = Color(0.9, 0.95, 1, 1)
 shader_parameter/roughness = 0.250000011875
 shader_parameter/water_alpha = 1.0
 shader_parameter/underwater_alpha = 0.90000004275
-shader_parameter/wave_a = PackedVector4Array(1, 0, 0.19634955, 0.25, 0.76604444, 0.64278764, 0.2991993, 0.15, 0.81915206, -0.57357645, 0.44879895, 0.08, 0.17364818, 0.9848077, 0.6981317, 0.04)
-shader_parameter/wave_phase = Vector4(2.252119, 4.0092497, 4.064726, 0.5524401)
+shader_parameter/wave_a = PackedVector4Array(1, 0, 0.19634955, 0.5, 0.76604444, 0.64278764, 0.15707964, 0.3, 0.81915206, -0.57357645, 0.17453292, 0.16, 0.17364818, 0.9848077, 0.1308997, 0.08)
+shader_parameter/wave_phase = Vector4(2.6646018, 3.3732486, 4.5888386, 1.1616746)
 shader_parameter/foam_distance = 0.05
 shader_parameter/foam_stepping = 100.0
 shader_parameter/depth_distance = 4.0
 shader_parameter/edge_fog_color = Color(0.65, 0.78, 0.92, 1)
-shader_parameter/fade_start = 74.39999999999999
-shader_parameter/fade_end = 124.0
+shader_parameter/fade_start = 297.59999999999997
+shader_parameter/fade_end = 496.0
 shader_parameter/edge_fog_max_strength = 1.0
+
+[sub_resource type="PhysicsMaterial" id="PhysicsMaterial_6yi1q"]
+rough = true
 
 [sub_resource type="BoxShape3D" id="BoxShape3D_ocean"]
 size = Vector3(500, 250, 500)
@@ -119,7 +129,7 @@ size = Vector3(500, 250, 10)
 
 [sub_resource type="LabelSettings" id="LabelSettings_q176i"]
 font = ExtResource("16_vlub6")
-font_size = 50
+font_size = 25
 shadow_color = Color(0, 0, 0, 0.392157)
 
 [node name="Main" type="Node3D" unique_id=516018331 node_paths=PackedStringArray("world_environment_node")]
@@ -128,18 +138,20 @@ world_environment_node = NodePath("WorldEnvironment")
 underwater_ambient_multiplier = 0.5
 underwater_min_light = 0.0
 
-[node name="Player" parent="." unique_id=1514412654 node_paths=PackedStringArray("view_node") instance=ExtResource("2_jscy8")]
-transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.2, 6.0164056, -66.118)
-view_node = NodePath("../View")
-JUMP_HEIGHT = 7.0
-fluid_damp = 15.0
-sink_accel = 10.0
+[node name="World" type="GridMap" parent="." unique_id=1685192174]
+mesh_library = SubResource("MeshLibrary_7d2os")
+bake_navigation = true
 
-[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=558144835]
-environment = ExtResource("3_gqmmt")
+[node name="Sun" type="DirectionalLight3D" parent="." unique_id=994137855]
+transform = Transform3D(-0.42261794, -0.6942719, 0.58256376, 0, 0.64278793, 0.7660442, -0.9063079, 0.32374403, -0.27165374, 0, 0, 0)
+shadow_enabled = true
+shadow_opacity = 0.75
+directional_shadow_fade_start = 0.0
 
 [node name="DayNightCycle" type="Node3D" parent="." unique_id=1613808279 node_paths=PackedStringArray("sun", "world_environment")]
 script = ExtResource("29_fv21b")
+time_of_day = 0.5
+start_time = 0.3
 sun = NodePath("../Sun")
 world_environment = NodePath("../WorldEnvironment")
 horizon_light_energy = 2.0
@@ -147,35 +159,47 @@ moon_light_energy = 0.1
 moon_shadows = true
 noon_sky_energy = 1.5
 night_sky_energy = 1.0
-night_fog_color = Color(0.052878626, 0.05904805, 0.10227851, 1)
+night_fog_color = Color(0.08026131, 0.09025372, 0.14516881, 1)
 noon_fog_density = 0.02
 
-[node name="Terrain" parent="." unique_id=179508897 instance=ExtResource("5_jscy8")]
+[node name="WorldEnvironment" type="WorldEnvironment" parent="." unique_id=558144835]
+environment = ExtResource("3_gqmmt")
 
-[node name="LandChunkLoader" type="Node" parent="." unique_id=433605953 node_paths=PackedStringArray("target", "builder")]
-script = ExtResource("14_jscy8")
-terrain_group = "terrain_land"
-terrain_node_name = "Base"
-target = NodePath("../Player")
-builder = NodePath("../Builder")
-metadata/_custom_type_script = "uid://dn7i8yp68pgnm"
+[node name="Player" parent="." unique_id=1514412654 node_paths=PackedStringArray("view_node") instance=ExtResource("2_jscy8")]
+transform = Transform3D(0.5, 0, 0, 0, 0.5, 0, 0, 0, 0.5, 6.2, 6.0164056, -66.118)
+view_node = NodePath("../View")
+WATER_RESISTANCE = 0.95
+fluid_damp = 15.0
 
-[node name="Boat" parent="." unique_id=322618501 instance=ExtResource("7_gqmmt")]
+[node name="Boat1" parent="." unique_id=322618501 instance=ExtResource("7_gqmmt")]
 transform = Transform3D(1, 0, 0, 0, 0.9721717, 0.23426932, 0, -0.23426932, 0.9721717, 0, 3.5317965, -74.851494)
+mass = 50.0
+floater_radius = 2.0
+damping_ratio = 2.0
+
+[node name="Boat2" parent="." unique_id=2142268755 instance=ExtResource("7_gqmmt")]
+transform = Transform3D(1, 0, 0, 0, 0.9880135, 0.1543681, 0, -0.1543681, 0.9880135, 3, 3.5317965, -74.851494)
+mass = 50.0
 floater_radius = 2.0
 damping_ratio = 2.0
 
 [node name="WaterSurface" type="Node3D" parent="." unique_id=801661843]
 process_priority = 100
 script = ExtResource("32_water_surface")
+cell_size = 8.0
 directions_deg = PackedFloat32Array(0, 40, -35, 80)
-wavelengths = PackedFloat32Array(32, 21, 14, 9)
-amplitudes = PackedFloat32Array(0.25, 0.15, 0.08, 0.04)
+wavelengths = PackedFloat32Array(32, 40, 36, 48)
+amplitudes = PackedFloat32Array(0.5, 0.3, 0.16, 0.08)
 animate_in_editor = true
 material = SubResource("ShaderMaterial_020yl")
 
 [node name="WaterDebug" type="Node3D" parent="." unique_id=2024905295]
 script = ExtResource("33_water_debug")
+
+[node name="Boulder" parent="." unique_id=454780621 instance=ExtResource("25_og1vs")]
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 3.847888, 9.249396, -47.842995)
+mass = 200.0
+physics_material_override = SubResource("PhysicsMaterial_6yi1q")
 
 [node name="OceanFluid" type="Area3D" parent="." unique_id=2141772413 node_paths=PackedStringArray("water_surface")]
 collision_layer = 4
@@ -201,12 +225,6 @@ transform = Transform3D(1, 0, 0, 0, -4.37114e-08, -1, 0, 1, -4.37114e-08, 0, 0.1
 texture = ExtResource("4_wr1wv")
 
 [node name="Container" type="Node3D" parent="Builder/Selector" unique_id=790926761]
-
-[node name="Sun" type="DirectionalLight3D" parent="." unique_id=994137855]
-transform = Transform3D(-0.422618, -0.694272, 0.582563, 0, 0.642788, 0.766044, -0.906308, 0.323744, -0.271654, 0, 0, 0)
-shadow_enabled = true
-shadow_opacity = 0.75
-directional_shadow_mode = 1
 
 [node name="View" type="Node3D" parent="." unique_id=324000787 node_paths=PackedStringArray("target")]
 transform = Transform3D(0.707107, -0.40558, 0.579228, 0, 0.819152, 0.573576, -0.707107, -0.40558, 0.579228, 0, -1, 0)
@@ -263,12 +281,7 @@ transform = Transform3D(-4.371139e-08, 0, 1, 0, 1, 0, -1, 0, -4.371139e-08, 250,
 shape = SubResource("BoxShape3D_jscy8")
 debug_color = Color(0.4268808, 0.8921722, 0.9999998, 1)
 
-[node name="Trees" type="Node3D" parent="." unique_id=30058757]
-
-[node name="MultiMeshInstance3D" type="MultiMeshInstance3D" parent="Trees" unique_id=145539410]
-
 [node name="CanvasLayer" type="CanvasLayer" parent="." unique_id=327302228]
-visible = false
 follow_viewport_enabled = true
 
 [node name="Top" type="Control" parent="CanvasLayer" unique_id=560779850]
@@ -282,22 +295,23 @@ offset_bottom = 40.0
 layout_mode = 1
 offset_left = 21.0
 offset_top = 17.0
-offset_right = 414.33334
-offset_bottom = 417.0
+offset_right = 177.66666
+offset_bottom = 173.66666
 scale = Vector2(0.3, 0.3)
 texture = ExtResource("25_fv21b")
 stretch_mode = 5
 
 [node name="Wood" type="Label" parent="CanvasLayer/Top" unique_id=736088984]
 layout_mode = 0
-offset_left = 167.0
-offset_top = 44.0
-offset_right = 368.0
-offset_bottom = 118.0
+offset_left = 80.0
+offset_top = 26.0
+offset_right = 190.0
+offset_bottom = 56.0
 text = "0"
 label_settings = SubResource("LabelSettings_q176i")
 
 [node name="Bottom" type="Control" parent="CanvasLayer" unique_id=2090717113]
+visible = false
 layout_mode = 3
 anchors_preset = 2
 anchor_top = 1.0
@@ -314,6 +328,15 @@ offset_right = 344.0
 offset_bottom = 887.0
 scale = Vector2(0.5, 0.5)
 texture = ExtResource("22_pm3ni")
+
+[node name="Overlay" type="Control" parent="CanvasLayer" unique_id=1797650596]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 4
 
 [node name="AudioStreamPlayer" type="AudioStreamPlayer" parent="." unique_id=115452384 node_paths=PackedStringArray("camera")]
 stream = ExtResource("24_y6deb")
